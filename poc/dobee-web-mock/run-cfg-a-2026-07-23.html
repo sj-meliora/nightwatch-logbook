@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>dobee — run mock-cfg-a-2026-07-23</title>
+</head>
+<body>
+<h1>dobee result viewer (mock)</h1>
+<p>config: cfg-a / date: 2026-07-23</p>
+<div id="summary">
+  total <span id="summary-total"></span> /
+  pass <span id="summary-pass"></span> /
+  fail <span id="summary-fail"></span>
+</div>
+<table id="results-table">
+  <thead><tr><th>TC</th><th>status</th><th>log</th><th>link</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script id="run-data" type="application/json">
+{
+  "summary": { "total": 150, "pass": 144, "fail": 6 },
+  "cases": [
+    { "tc": "TC_FTL_GC_003",   "status": "fail", "log": "ASSERT at gc_policy.c:88: victim_score < 0", "run": 8812 },
+    { "tc": "TC_FTL_WEAR_101", "status": "fail", "log": "TIMEOUT after 1800s in wear_level_stress", "run": 8812 },
+    { "tc": "TC_IO_RAND_034",  "status": "fail", "log": "MISCOMPARE lba=0x3f2a10 expected=0xAA got=0x00", "run": 8812 },
+    { "tc": "TC_FTL_GC_017",   "status": "fail", "log": "ASSERT at gc_victim.c:412: invalid victim block state during gc", "run": 8812 },
+    { "tc": "TC_FTL_MAP_205",  "status": "fail", "log": "SEGV in map_cache_evict(), map_cache.c:207", "run": 8812 },
+    { "tc": "TC_IO_SEQ_078",   "status": "fail", "log": "IO latency spike 4200ms > budget 500ms in seq write", "run": 8812 },
+    { "tc": "TC_META_SNAP_007","status": "pass", "log": "", "run": 8812 },
+    { "tc": "TC_PWR_LOSS_112", "status": "pass", "log": "", "run": 8812 }
+  ]
+}
+</script>
+<script>
+setTimeout(() => {
+  const data = JSON.parse(document.getElementById("run-data").textContent);
+  document.getElementById("summary-total").textContent = data.summary.total;
+  document.getElementById("summary-pass").textContent = data.summary.pass;
+  document.getElementById("summary-fail").textContent = data.summary.fail;
+  const tbody = document.querySelector("#results-table tbody");
+  for (const c of data.cases) {
+    const tr = document.createElement("tr");
+    tr.dataset.tc = c.tc;
+    tr.dataset.status = c.status;
+    tr.innerHTML =
+      `<td>${c.tc}</td><td>${c.status}</td>` +
+      `<td class="log-excerpt">${c.log}</td>` +
+      `<td><a class="log-link" href="https://dobee.example.internal/run/${c.run}/tc/${c.tc}">log</a></td>`;
+    tbody.appendChild(tr);
+  }
+}, 150);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dobee-cli"
+version = "0.1.0"
+description = "dobee 서비스 접근 프리미티브 (submit / parse-result). AutoDevOps 공유 feature 모듈."
+requires-python = ">=3.10"
+dependencies = [
+    # 폐쇄망 배포 주의: 사전 설치된 Playwright 브라우저 리비전과 맞는 버전으로 핀.
+    # (rev 1194 == playwright 1.56.x — poc/RUNLOG.md 검증 기록 참조)
+    "playwright==1.56.0",
+]
+
+[project.scripts]
+dobee = "dobee_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

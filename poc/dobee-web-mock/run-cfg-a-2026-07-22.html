@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>dobee — run mock-cfg-a-2026-07-22</title>
+</head>
+<body>
+<h1>dobee result viewer (mock)</h1>
+<p>config: cfg-a / date: 2026-07-22</p>
+<div id="summary">
+  total <span id="summary-total"></span> /
+  pass <span id="summary-pass"></span> /
+  fail <span id="summary-fail"></span>
+</div>
+<table id="results-table">
+  <thead><tr><th>TC</th><th>status</th><th>log</th><th>link</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<!-- 실제 dobee처럼 데이터는 JS가 비동기로 그린다. 정적 파싱(curl+grep)으로는
+     tbody가 비어 있어 실패한다 — headless 브라우저가 필요한 이유를 재현. -->
+<script id="run-data" type="application/json">
+{
+  "summary": { "total": 150, "pass": 145, "fail": 5 },
+  "cases": [
+    { "tc": "TC_FTL_GC_003",   "status": "fail", "log": "ASSERT at gc_policy.c:88: victim_score < 0", "run": 8641 },
+    { "tc": "TC_FTL_WEAR_101", "status": "fail", "log": "TIMEOUT after 1800s in wear_level_stress", "run": 8641 },
+    { "tc": "TC_IO_RAND_034",  "status": "fail", "log": "MISCOMPARE lba=0x3f2a10 expected=0xAA got=0x00", "run": 8641 },
+    { "tc": "TC_META_SNAP_007","status": "fail", "log": "PANIC: snapshot replay mismatch, gen=42", "run": 8641 },
+    { "tc": "TC_PWR_LOSS_112", "status": "fail", "log": "recovery loop exceeded 3 retries after power cut", "run": 8641 },
+    { "tc": "TC_FTL_GC_017",   "status": "pass", "log": "", "run": 8641 },
+    { "tc": "TC_FTL_MAP_205",  "status": "pass", "log": "", "run": 8641 },
+    { "tc": "TC_IO_SEQ_078",   "status": "pass", "log": "", "run": 8641 }
+  ]
+}
+</script>
+<script>
+setTimeout(() => {
+  const data = JSON.parse(document.getElementById("run-data").textContent);
+  document.getElementById("summary-total").textContent = data.summary.total;
+  document.getElementById("summary-pass").textContent = data.summary.pass;
+  document.getElementById("summary-fail").textContent = data.summary.fail;
+  const tbody = document.querySelector("#results-table tbody");
+  for (const c of data.cases) {
+    const tr = document.createElement("tr");
+    tr.dataset.tc = c.tc;
+    tr.dataset.status = c.status;
+    tr.innerHTML =
+      `<td>${c.tc}</td><td>${c.status}</td>` +
+      `<td class="log-excerpt">${c.log}</td>` +
+      `<td><a class="log-link" href="https://dobee.example.internal/run/${c.run}/tc/${c.tc}">log</a></td>`;
+    tbody.appendChild(tr);
+  }
+}, 150); // 비동기 렌더 지연 시뮬레이션
+</script>
+</body>
+</html>
