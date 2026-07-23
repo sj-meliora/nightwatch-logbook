@@ -1,0 +1,78 @@
+{
+  "config": "cfg-b",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 5,
+      "new_fail": 0,
+      "pass": 415,
+      "total": 420
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 6,
+      "new_fail": 1,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 6,
+      "new_fail": 1,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-20",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 414,
+      "total": 420
+    },
+    {
+      "date": "2026-07-21",
+      "fail": 7,
+      "new_fail": 1,
+      "pass": 413,
+      "total": 420
+    },
+    {
+      "date": "2026-07-22",
+      "fail": 8,
+      "new_fail": 1,
+      "pass": 412,
+      "total": 420
+    },
+    {
+      "date": "2026-07-23",
+      "fail": 7,
+      "new_fail": 0,
+      "pass": 413,
+      "total": 420
+    }
+  ],
+  "label": "NVMe protocol suite",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}

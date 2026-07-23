@@ -1,0 +1,20 @@
+{
+  "configs": [
+    {
+      "id": "cfg-a",
+      "label": "FTL full regression",
+      "total": 900
+    },
+    {
+      "id": "cfg-b",
+      "label": "NVMe protocol suite",
+      "total": 420
+    },
+    {
+      "id": "cfg-c",
+      "label": "smoke suite",
+      "total": 150
+    }
+  ],
+  "schema_version": 1
+}

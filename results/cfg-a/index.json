@@ -1,0 +1,78 @@
+{
+  "config": "cfg-a",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 23,
+      "new_fail": 0,
+      "pass": 877,
+      "total": 900
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 24,
+      "new_fail": 1,
+      "pass": 876,
+      "total": 900
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 25,
+      "new_fail": 1,
+      "pass": 875,
+      "total": 900
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 25,
+      "new_fail": 0,
+      "pass": 875,
+      "total": 900
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 25,
+      "new_fail": 1,
+      "pass": 875,
+      "total": 900
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 26,
+      "new_fail": 1,
+      "pass": 874,
+      "total": 900
+    },
+    {
+      "date": "2026-07-20",
+      "fail": 26,
+      "new_fail": 1,
+      "pass": 874,
+      "total": 900
+    },
+    {
+      "date": "2026-07-21",
+      "fail": 26,
+      "new_fail": 0,
+      "pass": 874,
+      "total": 900
+    },
+    {
+      "date": "2026-07-22",
+      "fail": 25,
+      "new_fail": 0,
+      "pass": 875,
+      "total": 900
+    },
+    {
+      "date": "2026-07-23",
+      "fail": 28,
+      "new_fail": 3,
+      "pass": 872,
+      "total": 900
+    }
+  ],
+  "label": "FTL full regression",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}

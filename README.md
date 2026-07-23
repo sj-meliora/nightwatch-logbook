@@ -1,0 +1,73 @@
+# nightwatch-logbook
+
+daily regression 결과를 기록하는 로그북 repo의 PoC입니다.
+**열흘치 daily log 예시 데이터**와 이를 보여주는 **정적 대시보드**로 구성됩니다.
+
+## 구조
+
+```
+results/
+├─ configs.json                  # 구성 목록 매니페스트 (대시보드가 구성을 하드코딩하지 않도록)
+├─ {config}/{YYYY-MM-DD}.json    # 데일리 원본 — 생성 후 불변, JSON이 source of truth
+└─ {config}/index.json           # 파생 rollup — 날짜별 summary 배열, 매일 재생성
+docs/
+└─ index.html                    # 정적 대시보드 (의존성 없는 단일 파일, GitHub Pages용)
+scripts/
+└─ generate_sample_data.py       # 예시 데이터 생성기 (2026-07-14 ~ 07-23, 구성 3개)
+```
+
+### 데일리 JSON 스키마 (`schema_version: 1`)
+
+```json
+{
+  "schema_version": 1,
+  "config": "cfg-a",
+  "date": "2026-07-23",
+  "summary": { "total": 900, "pass": 872, "fail": 28, "new_fail": 3 },
+  "failures": {
+    "TC_FTL_GC_017": {
+      "status": "new",
+      "since": "2026-07-23",
+      "log_excerpt": "ASSERT at gc_victim.c:412 ...",
+      "log_url": "https://dobee.example.internal/run/8799/tc/TC_FTL_GC_017",
+      "suspect_sha": "a3f9c21",
+      "author": "kim.xx",
+      "confidence": "high"
+    }
+  }
+}
+```
+
+- `failures`는 배열이 아닌 **TC 이름 키 객체 + 키 정렬 + pretty print** —
+  git diff 자체가 TC 추가/제거를 사람이 읽을 수 있는 형태로 보여줍니다.
+- 실패 로그는 **발췌 + 링크만** 커밋하고 원본은 dobee URL을 참조합니다.
+- `suspect_sha` / `author` / `confidence`(high·medium·unknown)는 **agent 추정 결과**로,
+  dobee가 알려주는 사실(로그)과 구분됩니다.
+- git 이력이 시계열 DB 역할을 합니다: 전날 대비 diff는 파일 비교,
+  fail 시작 시점은 `git log`로 추적합니다.
+
+## 대시보드 보기
+
+로컬:
+
+```sh
+python3 -m http.server        # repo 루트에서 실행
+# http://localhost:8000/docs/ 접속
+```
+
+GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가능합니다
+(대시보드 JS가 `../results/`를 fetch하므로 repo 루트가 서빙 루트여야 합니다).
+
+기능: 구성별 fail 추이 라인 차트(hover 툴팁·크로스헤어, 데이터 표 뷰),
+전일 대비 스탯 타일, 날짜 클릭/선택 시 해당일 failure 상세 테이블
+(신규 fail 상단 정렬, 추정 원인·확신도, dobee 로그 링크). 라이트/다크 테마 지원.
+
+## 예시 데이터 재생성
+
+```sh
+python3 scripts/generate_sample_data.py
+```
+
+구성 시나리오: `cfg-a`(FTL full regression, TC 900 — 만성 fail 22건 + 에피소드,
+7/23에 신규 3건), `cfg-b`(NVMe protocol suite, TC 420), `cfg-c`(smoke suite,
+TC 150 — 대부분 all green).
