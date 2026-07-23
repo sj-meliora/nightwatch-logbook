@@ -1,0 +1,78 @@
+{
+  "config": "cfg-f",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 5,
+      "new_fail": 1,
+      "pass": 495,
+      "total": 500
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 5,
+      "new_fail": 0,
+      "pass": 495,
+      "total": 500
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-20",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-21",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-22",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    },
+    {
+      "date": "2026-07-23",
+      "fail": 4,
+      "new_fail": 0,
+      "pass": 496,
+      "total": 500
+    }
+  ],
+  "label": "IO performance",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}

@@ -1,0 +1,71 @@
+{
+  "configs": [
+    {
+      "dobee_name": "ftl_full_regr_v2",
+      "id": "cfg-a",
+      "label": "FTL full regression",
+      "renamed_from": [
+        "ftl_full_regr"
+      ],
+      "total": 900
+    },
+    {
+      "id": "cfg-b",
+      "label": "NVMe protocol suite",
+      "total": 420
+    },
+    {
+      "id": "cfg-c",
+      "label": "smoke suite",
+      "total": 150
+    },
+    {
+      "id": "cfg-d",
+      "label": "FTL GC stress",
+      "total": 300
+    },
+    {
+      "id": "cfg-e",
+      "label": "power loss recovery",
+      "total": 250
+    },
+    {
+      "id": "cfg-f",
+      "label": "IO performance",
+      "total": 500
+    },
+    {
+      "id": "cfg-g",
+      "label": "metadata journal",
+      "total": 350
+    },
+    {
+      "id": "cfg-h",
+      "label": "security & sanitize",
+      "total": 180
+    },
+    {
+      "id": "cfg-i",
+      "label": "compat matrix",
+      "total": 600
+    },
+    {
+      "id": "cfg-j",
+      "label": "wear leveling soak",
+      "total": 220
+    },
+    {
+      "id": "cfg-k",
+      "label": "thermal & throttle",
+      "since": "2026-07-18",
+      "total": 280
+    },
+    {
+      "id": "cfg-l",
+      "label": "legacy sanitize suite",
+      "retired": "2026-07-20",
+      "total": 190
+    }
+  ],
+  "schema_version": 1
+}

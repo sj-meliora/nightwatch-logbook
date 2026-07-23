@@ -1,0 +1,29 @@
+{
+  "config": "cfg-k",
+  "date": "2026-07-22",
+  "failures": {
+    "TC_THM_OSC_011": {
+      "confidence": "unknown",
+      "log_excerpt": "throttle oscillation 2Hz between P1/P3",
+      "log_url": "https://dobee.example.internal/run/10088/tc/TC_THM_OSC_011",
+      "since": "2026-07-22",
+      "status": "new",
+      "suspect_sha": "f31c807"
+    },
+    "TC_THM_SENSOR_024": {
+      "confidence": null,
+      "log_excerpt": "composite temp sensor stuck during thermal ramp",
+      "log_url": "https://dobee.example.internal/run/10088/tc/TC_THM_SENSOR_024",
+      "since": "2026-07-22",
+      "status": "new",
+      "suspect_sha": null
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "fail": 2,
+    "new_fail": 2,
+    "pass": 278,
+    "total": 280
+  }
+}

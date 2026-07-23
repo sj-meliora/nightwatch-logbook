@@ -1,0 +1,50 @@
+{
+  "config": "cfg-l",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 188,
+      "total": 190
+    }
+  ],
+  "label": "legacy sanitize suite",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}

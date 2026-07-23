@@ -1,0 +1,21 @@
+{
+  "config": "cfg-c",
+  "date": "2026-07-17",
+  "failures": {
+    "TC_SMOKE_BOOT_001": {
+      "confidence": null,
+      "log_excerpt": "boot-to-ready 6.2s > smoke budget 5s",
+      "log_url": "https://dobee.example.internal/run/4433/tc/TC_SMOKE_BOOT_001",
+      "since": "2026-07-16",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "fail": 1,
+    "new_fail": 0,
+    "pass": 149,
+    "total": 150
+  }
+}

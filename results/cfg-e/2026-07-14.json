@@ -1,0 +1,37 @@
+{
+  "config": "cfg-e",
+  "date": "2026-07-14",
+  "failures": {
+    "TC_PLR_CAP_021": {
+      "confidence": null,
+      "log_excerpt": "cap discharge curve below spec at 85C",
+      "log_url": "https://dobee.example.internal/run/5800/tc/TC_PLR_CAP_021",
+      "since": "2026-07-08",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PLR_NESTED_033": {
+      "confidence": null,
+      "log_excerpt": "nested power cut during replay corrupts journal tail",
+      "log_url": "https://dobee.example.internal/run/5800/tc/TC_PLR_NESTED_033",
+      "since": "2026-07-12",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PLR_SPOR_009": {
+      "confidence": null,
+      "log_excerpt": "spor iteration 412 mount fail, dirty map",
+      "log_url": "https://dobee.example.internal/run/5800/tc/TC_PLR_SPOR_009",
+      "since": "2026-06-30",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "fail": 3,
+    "new_fail": 0,
+    "pass": 247,
+    "total": 250
+  }
+}
