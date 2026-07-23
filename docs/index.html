@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nightwatch Logbook — daily regression</title>
+<style>
+  /* ---- 테마 토큰: OS 설정(prefers-color-scheme) + 토글(data-theme)이 둘 다 이긴다 ---- */
+  :root {
+    color-scheme: light;
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --ink:         #0b0b0b;
+    --ink-2:       #52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --wash:        rgba(11,11,11,0.035);
+    --accent:      #2a78d6;
+    --critical:    #d03b3b;  /* 신규 fail */
+    --good-text:   #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --muted:     #898781;
+      --grid:      #2c2c2a;
+      --baseline:  #383835;
+      --border:    rgba(255,255,255,0.10);
+      --wash:      rgba(255,255,255,0.05);
+      --accent:    #3987e5;
+      --critical:  #d03b3b;
+      --good-text: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --baseline:  #383835;
+    --border:    rgba(255,255,255,0.10);
+    --wash:      rgba(255,255,255,0.05);
+    --accent:    #3987e5;
+    --critical:  #d03b3b;
+    --good-text: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--ink-2); }
+  header .spacer { flex: 1; }
+  #theme-toggle {
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+    border-radius: 8px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .caption { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+
+  /* ---- 스탯 타일 ---- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; }
+  .tile .label { color: var(--ink-2); font-size: 12.5px; }
+  .tile .value { font-size: 30px; font-weight: 600; line-height: 1.2; }
+  .tile .delta { font-size: 12.5px; color: var(--ink-2); }
+  .tile .delta.up   { color: var(--critical); }
+  .tile .delta.down { color: var(--good-text); }
+
+  /* ---- 구성 현황 테이블 ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-top: 1px solid var(--grid); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+
+  #config-table tbody tr { cursor: pointer; }
+  #config-table tbody tr:hover { background: var(--wash); }
+  #config-table tbody tr.selected { background: var(--wash); box-shadow: inset 3px 0 0 var(--accent); }
+  #config-table .cfg-label { color: var(--ink-2); }
+  #config-table .delta-up { color: var(--critical); }
+  #config-table .delta-down { color: var(--good-text); }
+  #config-table .delta-flat, #config-table .zero { color: var(--muted); }
+  #config-table .new-cell { color: var(--critical); font-weight: 600; }
+  #config-table .spark { display: block; }
+  #config-table .green-dot { color: var(--good-text); }
+  #config-table tbody tr.retired { opacity: 0.55; }
+  .lifecycle-chip {
+    color: var(--muted); font-size: 11px; white-space: nowrap;
+    border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; margin-left: 8px;
+  }
+
+  /* ---- 추이 차트 ---- */
+  #chart-wrap { position: relative; }
+  #chart { display: block; width: 100%; height: auto; }
+  #chart text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none; z-index: 3;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    padding: 8px 12px; min-width: 140px; font-size: 12.5px;
+  }
+  #tooltip .tt-date { color: var(--muted); margin-bottom: 4px; }
+  #tooltip .tt-row { display: flex; align-items: baseline; gap: 7px; margin: 2px 0; }
+  #tooltip .tt-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #tooltip .tt-name { color: var(--ink-2); }
+  #tooltip .tt-new { color: var(--critical); }
+
+  details.trend-table { margin-top: 4px; }
+  details.trend-table summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  #trend-matrix-wrap { overflow-x: auto; margin-top: 8px; }
+  #trend-matrix td.has-new { color: var(--critical); font-weight: 600; }
+  #trend-matrix td.zero { color: var(--muted); }
+  #trend-matrix .cfg-col { white-space: nowrap; }
+
+  /* ---- 날짜별 상세 ---- */
+  .detail-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail-head select {
+    font: inherit; padding: 3px 8px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  }
+  details.cfg-block { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; }
+  details.cfg-block summary {
+    cursor: pointer; list-style-position: outside;
+    font-size: 13.5px; font-weight: 600;
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  details.cfg-block summary::-webkit-details-marker { display: none; }
+  details.cfg-block summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
+  details.cfg-block[open] summary::before { content: "▾"; }
+  details.cfg-block summary .sum { color: var(--ink-2); font-weight: 400; font-size: 12.5px; }
+  details.cfg-block summary .new-chip {
+    color: var(--critical); font-weight: 600; font-size: 12px; white-space: nowrap;
+  }
+  details.cfg-block table { margin-top: 8px; }
+  td { vertical-align: top; }
+  .excerpt { color: var(--ink-2); }
+  .badge-new {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--critical); font-weight: 600; font-size: 12px; white-space: nowrap;
+  }
+  .badge-new::before { content: "▲"; font-size: 9px; }
+  .st-ongoing { color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+  .since { color: var(--muted); font-size: 11.5px; }
+  .conf { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  .all-green-line { color: var(--good-text); font-size: 13px; margin-top: 12px;
+                    border-top: 1px solid var(--grid); padding-top: 10px; }
+  .not-op-line { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  a { color: var(--accent); }
+
+  #error-box { display: none; border: 1px solid var(--critical); color: var(--critical);
+               border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; }
+
+  /* ---- 데일리 리포트 뷰어 ---- */
+  .sha-link {
+    font: inherit; border: none; background: none; padding: 0; cursor: pointer;
+    color: var(--accent); text-decoration: underline;
+    text-underline-offset: 2px; text-decoration-thickness: 1px;
+  }
+  #report-btn, #monthly-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+    border-radius: 8px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  #report-overlay {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(0,0,0,0.35);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 5vh 16px;
+  }
+  #report-overlay[hidden] { display: none; }
+  #report-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    width: min(760px, 100%); max-height: 88vh;
+    display: flex; flex-direction: column;
+  }
+  .report-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-bottom: 1px solid var(--grid);
+  }
+  .report-head .path { color: var(--ink-2); font-size: 12.5px; }
+  .report-head .spacer { flex: 1; }
+  #report-close {
+    border: 1px solid var(--border); background: none; color: var(--ink-2);
+    border-radius: 8px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  #report-body { overflow-y: auto; padding: 6px 24px 20px; }
+  .md h2 { font-size: 17px; margin: 14px 0 6px; }
+  .md h3 { font-size: 14.5px; margin: 16px 0 6px; }
+  .md h4 { font-size: 13.5px; margin: 14px 0 4px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .md h4.anchor-hit { background: var(--wash); box-shadow: inset 3px 0 0 var(--accent);
+                      padding: 4px 8px; border-radius: 6px; }
+  .md p { margin: 6px 0; }
+  .md ul { margin: 6px 0; padding-left: 22px; }
+  .md li { margin: 3px 0; }
+  .md code { background: var(--wash); border-radius: 5px; padding: 1px 5px;
+             font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+  .md blockquote { color: var(--muted); border-left: 3px solid var(--grid);
+                   margin: 10px 0; padding: 2px 14px; font-size: 12.5px; }
+  .md-table-wrap { overflow-x: auto; margin: 8px 0; }
+  .md table { width: auto; font-size: 12.5px; }
+  .md th, .md td { padding: 4px 12px; }
+  .md td { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Nightwatch Logbook</h1>
+    <span class="sub">daily regression 대시보드</span>
+    <span class="spacer"></span>
+    <span class="sub" id="range-label"></span>
+    <button id="theme-toggle" type="button">테마 전환</button>
+  </header>
+
+  <div id="error-box"></div>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="card">
+    <h2>구성 현황</h2>
+    <p class="caption">신규 fail·증감 많은 순 정렬 · 행을 클릭하면 아래 추이 차트가 해당 구성으로 전환</p>
+    <div style="overflow-x:auto">
+      <table id="config-table"></table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 id="chart-title">fail 추이 — 전체 합계</h2>
+    <p class="caption">일자별 fail TC 수 · <span style="color:var(--critical)">●</span> 신규 fail 발생일 · 차트를 클릭하면 해당 날짜 상세로 이동</p>
+    <div id="chart-wrap">
+      <svg id="chart" role="img" aria-label="일자별 fail 수 추이 선 그래프"></svg>
+      <div id="tooltip"></div>
+    </div>
+    <details class="trend-table">
+      <summary>전체 구성 × 날짜 매트릭스로 보기</summary>
+      <div id="trend-matrix-wrap"><table id="trend-matrix"></table></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <div class="detail-head">
+      <h2 style="margin:0">날짜별 상세</h2>
+      <select id="date-select" aria-label="상세 조회 날짜 선택"></select>
+      <button id="report-btn" type="button">일간 보고</button>
+      <button id="monthly-btn" type="button">월간 리뷰</button>
+    </div>
+    <div id="detail"></div>
+  </section>
+</main>
+
+<div id="report-overlay" hidden>
+  <div id="report-modal" role="dialog" aria-modal="true" aria-label="데일리 리포트">
+    <div class="report-head">
+      <span class="path mono" id="report-path"></span>
+      <span class="spacer"></span>
+      <button id="report-close" type="button">닫기 ✕</button>
+    </div>
+    <div id="report-body"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// 데이터 위치: repo 루트 기준 results/. GitHub Pages(main 브랜치 + root 서빙) 또는
+// `python3 -m http.server` (repo 루트에서 실행) 기준으로 동작한다.
+const DATA_BASE = new URL("../results/", location.href);
+const REPORT_BASE = new URL("../reviews/", location.href);
+const CONF_LABEL = { high: "높음", medium: "추정", unknown: "불명" };
+const AGG = null;  // selectedConfig가 이 값이면 전체 합계
+
+const state = { configs: [], index: {}, dates: [], daily: {},
+                selectedDate: null, selectedConfig: AGG };
+
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;  // 라벨은 신뢰하지 않는 데이터 — textContent만 사용
+  return n;
+};
+const svgEl = (tag, attrs) => {
+  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+};
+
+// ---- 테마 토글: data-theme 스탬프가 OS 설정을 양방향으로 이긴다 ----
+$("theme-toggle").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = getComputedStyle(root).colorScheme.includes("dark");
+  root.dataset.theme = dark ? "light" : "dark";
+  render();  // 색을 CSS 변수에서 읽으므로 다시 그린다
+});
+
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  return res.json();
+}
+
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  return res.text();
+}
+
+async function load() {
+  const manifest = await fetchJson(new URL("configs.json", DATA_BASE));
+  state.configs = manifest.configs;
+  await Promise.all(state.configs.map(async (cfg) => {
+    state.index[cfg.id] = await fetchJson(new URL(`${cfg.id}/index.json`, DATA_BASE));
+  }));
+  // 날짜 축 = 전 구성 날짜의 합집합 — 중간 추가/중단 구성은 일부 날짜가 없다
+  state.dates = [...new Set(Object.values(state.index)
+    .flatMap((ix) => ix.days.map((d) => d.date)))].sort();
+  state.selectedDate = state.dates[state.dates.length - 1];
+}
+
+async function dailyOf(cfgId, date) {
+  const key = `${cfgId}/${date}`;
+  if (!state.daily[key]) {
+    state.daily[key] = await fetchJson(new URL(`${cfgId}/${date}.json`, DATA_BASE));
+  }
+  return state.daily[key];
+}
+
+// 해당 날짜에 미운영(추가 전/중단 후)이면 undefined — 호출측은 결손 허용
+const dayRow = (cfgId, date) => state.index[cfgId].days.find((d) => d.date === date);
+const mmdd = (date) => date.slice(5).replace("-", "/");
+
+// 차트에 그릴 시계열: 구성 하나 또는 전체 합계. 미운영 날짜는 fail: null
+function seriesOf(cfgId) {
+  if (cfgId !== AGG) {
+    return state.dates.map((date) => {
+      const r = dayRow(cfgId, date);
+      return r ? { date, fail: r.fail, new_fail: r.new_fail }
+               : { date, fail: null, new_fail: 0 };
+    });
+  }
+  return state.dates.map((date) => {
+    let fail = 0, nf = 0, any = false;
+    for (const c of state.configs) {
+      const r = dayRow(c.id, date);
+      if (r) { any = true; fail += r.fail; nf += r.new_fail; }
+    }
+    return { date, fail: any ? fail : null, new_fail: nf };
+  });
+}
+
+// ---------------------------------------------------------------- 스탯 타일
+function renderStats() {
+  const last = state.dates[state.dates.length - 1];
+  const prev = state.dates[state.dates.length - 2];
+  const sum = (date, k) => state.configs.reduce((a, c) => {
+    const r = dayRow(c.id, date);
+    return a + (r ? r[k] : 0);
+  }, 0);
+
+  const failNow = sum(last, "fail");
+  const failDelta = failNow - sum(prev, "fail");
+  const newNow = sum(last, "new_fail");
+  const operating = state.configs.filter((c) => dayRow(c.id, last));
+  const green = operating.filter((c) => dayRow(c.id, last).fail === 0).length;
+
+  const stats = $("stats");
+  stats.replaceChildren();
+  const tile = (label, value, deltaNode) => {
+    const t = el("div", "tile");
+    t.appendChild(el("div", "label", label));
+    t.appendChild(el("div", "value", String(value)));
+    if (deltaNode) t.appendChild(deltaNode);
+    stats.appendChild(t);
+  };
+  const d = el("div", "delta" + (failDelta > 0 ? " up" : failDelta < 0 ? " down" : ""),
+               `${failDelta > 0 ? "▲" : failDelta < 0 ? "▼" : "—"} ${Math.abs(failDelta)} vs 전일`);
+  tile(`전체 fail (${mmdd(last)})`, failNow, d);
+  tile("신규 fail", newNow, el("div", "delta", "전 구성 합계"));
+  tile("fail 없는 구성", `${green} / ${operating.length}`,
+       el("div", "delta", "오늘 운영 구성 기준"));
+}
+
+// ---------------------------------------------------------------- 구성 현황
+function sparkline(cfgId) {
+  const days = state.index[cfgId].days;
+  const W = 120, H = 28, PAD = 3;
+  const max = Math.max(1, ...days.map((d) => d.fail));
+  const x = (i) => PAD + (i * (W - 2 * PAD)) / (days.length - 1);
+  const y = (v) => H - PAD - (v / max) * (H - 2 * PAD);
+
+  const svg = svgEl("svg", { width: W, height: H, class: "spark",
+    viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${cfgId} 최근 ${days.length}일 fail 추이` });
+  svg.appendChild(svgEl("line", { x1: PAD, x2: W - PAD, y1: y(0), y2: y(0),
+    stroke: css("--grid"), "stroke-width": 1 }));
+  svg.appendChild(svgEl("path", {
+    d: days.map((d, i) => `${i ? "L" : "M"}${x(i)},${y(d.fail)}`).join(""),
+    fill: "none", stroke: css("--accent"), "stroke-width": 1.5,
+    "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  const li = days.length - 1;
+  svg.appendChild(svgEl("circle", { cx: x(li), cy: y(days[li].fail), r: 2.5,
+    fill: css("--accent"), stroke: css("--surface"), "stroke-width": 1.5 }));
+  return svg;
+}
+
+function renderConfigTable() {
+  const last = state.dates[state.dates.length - 1];
+  const prev = state.dates[state.dates.length - 2];
+  const table = $("config-table");
+  table.replaceChildren();
+
+  const thead = el("thead");
+  const hr = el("tr");
+  for (const [t, cls] of [["구성", null], ["TC", "num"], ["fail", "num"],
+                          ["Δ 전일", "num"], ["신규", "num"], ["최근 10일", null]]) {
+    hr.appendChild(el("th", cls, t));
+  }
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const rows = state.configs.map((cfg) => {
+    const now = dayRow(cfg.id, last), before = dayRow(cfg.id, prev);
+    return { cfg, now,
+             delta: now && before ? now.fail - before.fail : 0 };
+  }).sort((a, b) => (a.now ? 0 : 1) - (b.now ? 0 : 1)  // 중단 구성은 맨 아래
+                 || (b.now?.new_fail ?? 0) - (a.now?.new_fail ?? 0)
+                 || b.delta - a.delta
+                 || (b.now?.fail ?? 0) - (a.now?.fail ?? 0)
+                 || a.cfg.id.localeCompare(b.cfg.id));
+
+  const tbody = el("tbody");
+  for (const { cfg, now, delta } of rows) {
+    const tr = el("tr");
+    tr.dataset.cfg = cfg.id;
+    if (state.selectedConfig === cfg.id) tr.classList.add("selected");
+    if (!now) tr.classList.add("retired");
+
+    const tdName = el("td");
+    tdName.appendChild(el("span", "mono", cfg.id));
+    tdName.appendChild(el("span", "cfg-label", `  ${cfg.label}`));
+    if (cfg.retired) {
+      tdName.appendChild(el("span", "lifecycle-chip", `중단 ${mmdd(cfg.retired)}`));
+    } else if (cfg.since && cfg.since > state.dates[0]) {
+      tdName.appendChild(el("span", "lifecycle-chip", `${mmdd(cfg.since)}~ 운영`));
+    }
+    tr.appendChild(tdName);
+
+    tr.appendChild(el("td", "num", String(cfg.total)));
+
+    const tdFail = el("td", "num" + (now?.fail === 0 ? " zero" : ""));
+    if (!now) {
+      tdFail.appendChild(el("span", "zero", "—"));
+    } else if (now.fail === 0) {
+      tdFail.appendChild(el("span", "green-dot", "✓ 0"));
+    } else {
+      tdFail.textContent = String(now.fail);
+    }
+    tr.appendChild(tdFail);
+
+    const cls = delta > 0 ? "delta-up" : delta < 0 ? "delta-down" : "delta-flat";
+    tr.appendChild(el("td", `num ${cls}`,
+      !now ? "—" : delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "—"));
+
+    tr.appendChild(el("td", "num" + (now?.new_fail ? " new-cell" : " zero"),
+      now?.new_fail ? String(now.new_fail) : "·"));
+
+    const tdSpark = el("td");
+    tdSpark.appendChild(sparkline(cfg.id));
+    tr.appendChild(tdSpark);
+
+    tr.addEventListener("click", () => {
+      state.selectedConfig = state.selectedConfig === cfg.id ? AGG : cfg.id;
+      renderConfigTable();
+      renderChart();
+    });
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+}
+
+// ---------------------------------------------------------------- 추이 차트
+const CH = { w: 1040, h: 300, top: 18, right: 96, bottom: 34, left: 44 };
+
+function niceStep(maxV) {
+  const raw = maxV / 4;
+  for (const s of [1, 2, 5, 10, 20, 25, 50, 100]) if (s >= raw) return s;
+  return 200;
+}
+
+function renderChart() {
+  const cfgId = state.selectedConfig;
+  const series = seriesOf(cfgId);
+  const label = cfgId === AGG ? "전체 합계"
+    : `${cfgId} · ${state.configs.find((c) => c.id === cfgId).label}`;
+  $("chart-title").textContent = `fail 추이 — ${label}`;
+
+  const svg = $("chart");
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${CH.w} ${CH.h}`);
+
+  const maxFail = Math.max(1, ...series.filter((d) => d.fail !== null).map((d) => d.fail));
+  const step = niceStep(maxFail);
+  const yMax = Math.max(step, Math.ceil(maxFail / step) * step);
+  const x = (i) => CH.left + (i * (CH.w - CH.left - CH.right)) / (series.length - 1);
+  const y = (v) => CH.top + (1 - v / yMax) * (CH.h - CH.top - CH.bottom);
+  const surface = css("--surface");
+  const accent = css("--accent");
+
+  // 가로 그리드(hairline solid) + y 눈금
+  for (let v = 0; v <= yMax; v += step) {
+    svg.appendChild(svgEl("line", { x1: CH.left, x2: CH.w - CH.right, y1: y(v), y2: y(v),
+      stroke: v === 0 ? css("--baseline") : css("--grid"), "stroke-width": 1 }));
+    svg.appendChild(Object.assign(svgEl("text", { x: CH.left - 8, y: y(v) + 4,
+      "text-anchor": "end", "font-size": 11, fill: css("--muted"),
+      style: "font-variant-numeric: tabular-nums" }), { textContent: v }));
+  }
+  // x 눈금 (일자)
+  series.forEach((d, i) => {
+    svg.appendChild(Object.assign(svgEl("text", { x: x(i), y: CH.h - 10,
+      "text-anchor": "middle", "font-size": 11, fill: css("--muted"),
+      style: "font-variant-numeric: tabular-nums" }), { textContent: mmdd(d.date) }));
+  });
+
+  // 선택된 날짜 표시
+  const selIdx = state.dates.indexOf(state.selectedDate);
+  if (selIdx >= 0) {
+    svg.appendChild(svgEl("line", { x1: x(selIdx), x2: x(selIdx), y1: CH.top, y2: y(0),
+      stroke: css("--baseline"), "stroke-width": 1, opacity: 0.9 }));
+  }
+
+  // 크로스헤어 (hover 시 표시)
+  const crosshair = svgEl("line", { x1: 0, x2: 0, y1: CH.top, y2: y(0),
+    stroke: css("--muted"), "stroke-width": 1, visibility: "hidden" });
+  svg.appendChild(crosshair);
+
+  // 단일 시리즈: 2px 라인(미운영 구간은 끊김) + 신규 fail 마커 + 끝점 라벨
+  let dPath = "", pen = false;
+  series.forEach((d, i) => {
+    if (d.fail === null) { pen = false; return; }
+    dPath += `${pen ? "L" : "M"}${x(i)},${y(d.fail)}`;
+    pen = true;
+  });
+  svg.appendChild(svgEl("path", { d: dPath, fill: "none", stroke: accent,
+    "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  series.forEach((d, i) => {
+    if (d.fail !== null && d.new_fail > 0) {
+      svg.appendChild(svgEl("circle", { cx: x(i), cy: y(d.fail), r: 4,
+        fill: css("--critical"), stroke: surface, "stroke-width": 2 }));
+    }
+  });
+  let li = series.length - 1;
+  while (li >= 0 && series[li].fail === null) li--;  // 중단 구성: 마지막 데이터 지점
+  if (li >= 0) {
+    if (series[li].new_fail === 0) {
+      svg.appendChild(svgEl("circle", { cx: x(li), cy: y(series[li].fail), r: 4,
+        fill: accent, stroke: surface, "stroke-width": 2 }));
+    }
+    svg.appendChild(Object.assign(svgEl("text", { x: x(li) + 10, y: y(series[li].fail) + 4,
+      "font-size": 12, fill: css("--ink-2"),
+      style: "font-variant-numeric: tabular-nums" }), { textContent: String(series[li].fail) }));
+  }
+
+  // hover 레이어: 크로스헤어가 X를 찾는다
+  const overlay = svgEl("rect", { x: CH.left, y: CH.top,
+    width: CH.w - CH.left - CH.right, height: CH.h - CH.top - CH.bottom,
+    fill: "transparent", cursor: "pointer" });
+  svg.appendChild(overlay);
+
+  const tooltip = $("tooltip");
+  const idxFromEvent = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * CH.w;
+    let best = 0, bestDist = Infinity;
+    series.forEach((_, i) => {
+      const dd = Math.abs(x(i) - px);
+      if (dd < bestDist) { bestDist = dd; best = i; }
+    });
+    return best;
+  };
+
+  overlay.addEventListener("pointermove", (ev) => {
+    const i = idxFromEvent(ev);
+    crosshair.setAttribute("x1", x(i));
+    crosshair.setAttribute("x2", x(i));
+    crosshair.setAttribute("visibility", "visible");
+
+    tooltip.replaceChildren(el("div", "tt-date", series[i].date));
+    const r1 = el("div", "tt-row");
+    if (series[i].fail === null) {
+      r1.appendChild(el("span", "tt-name", "미운영"));
+    } else {
+      r1.appendChild(el("span", "tt-val", String(series[i].fail)));
+      r1.appendChild(el("span", "tt-name", "fail"));
+    }
+    tooltip.appendChild(r1);
+    if (series[i].fail !== null && series[i].new_fail > 0) {
+      const r2 = el("div", "tt-row");
+      r2.appendChild(el("span", "tt-new", `신규 ${series[i].new_fail}`));
+      tooltip.appendChild(r2);
+    }
+    const wrapRect = $("chart-wrap").getBoundingClientRect();
+    const rect = svg.getBoundingClientRect();
+    const pxOnScreen = (x(i) / CH.w) * rect.width;
+    tooltip.style.display = "block";
+    const flip = pxOnScreen > wrapRect.width * 0.72;
+    tooltip.style.left = flip ? `${pxOnScreen - tooltip.offsetWidth - 14}px` : `${pxOnScreen + 14}px`;
+    tooltip.style.top = "20px";
+  });
+  overlay.addEventListener("pointerleave", () => {
+    crosshair.setAttribute("visibility", "hidden");
+    tooltip.style.display = "none";
+  });
+  overlay.addEventListener("click", (ev) => {
+    selectDate(state.dates[idxFromEvent(ev)]);
+  });
+}
+
+// 전체 구성 × 날짜 매트릭스 (차트의 테이블 뷰 — 접근성/relief 채널)
+function renderTrendMatrix() {
+  const table = $("trend-matrix");
+  table.replaceChildren();
+
+  const thead = el("thead");
+  const hr = el("tr");
+  hr.appendChild(el("th", "cfg-col", "구성"));
+  state.dates.forEach((d) => hr.appendChild(el("th", "num", mmdd(d))));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = el("tbody");
+  for (const cfg of state.configs) {
+    const tr = el("tr");
+    const tdName = el("td", "cfg-col mono", cfg.id);
+    tr.appendChild(tdName);
+    for (const date of state.dates) {
+      const r = dayRow(cfg.id, date);
+      if (!r) {  // 미운영 (추가 전 / 중단 후)
+        const td = el("td", "num zero", "—");
+        td.title = "미운영";
+        tr.appendChild(td);
+        continue;
+      }
+      const td = el("td", "num" + (r.new_fail > 0 ? " has-new" : r.fail === 0 ? " zero" : ""),
+        r.fail === 0 ? "·" : String(r.fail));
+      if (r.new_fail > 0) td.title = `신규 ${r.new_fail}`;
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+}
+
+// ---------------------------------------------------------------- 날짜별 상세
+async function renderDetail() {
+  const detail = $("detail");
+  detail.replaceChildren();
+
+  // 미운영 구성은 index rollup으로 사전 판별 — 데일리 파일 fetch 자체를 생략
+  const days = await Promise.all(
+    state.configs.map((cfg) => dayRow(cfg.id, state.selectedDate)
+      ? dailyOf(cfg.id, state.selectedDate).catch(() => null)
+      : Promise.resolve(null)));
+  const withFail = [];
+  const green = [];
+  const notOperating = [];
+  state.configs.forEach((cfg, i) => {
+    if (!days[i]) { notOperating.push(cfg.id); return; }
+    (days[i].summary.fail > 0 ? withFail : green).push({ cfg, day: days[i] });
+  });
+  // 신규 fail 있는 구성 먼저
+  withFail.sort((a, b) => b.day.summary.new_fail - a.day.summary.new_fail
+                       || b.day.summary.fail - a.day.summary.fail
+                       || a.cfg.id.localeCompare(b.cfg.id));
+
+  for (const { cfg, day } of withFail) {
+    const s = day.summary;
+    const block = el("details", "cfg-block");
+    if (s.new_fail > 0) block.open = true;  // 신규 있는 구성만 펼침
+
+    const summary = el("summary");
+    summary.appendChild(el("span", "mono", cfg.id));
+    summary.appendChild(el("span", null, cfg.label));
+    summary.appendChild(el("span", "sum",
+      `total ${s.total} · pass ${s.pass} · fail ${s.fail}`));
+    if (s.new_fail > 0) summary.appendChild(el("span", "new-chip", `▲ 신규 ${s.new_fail}`));
+    block.appendChild(summary);
+
+    const table = el("table");
+    const thead = el("thead");
+    const hr = el("tr");
+    for (const t of ["TC", "상태", "로그 발췌", "추정 원인 (agent)", "로그"]) {
+      hr.appendChild(el("th", null, t));
+    }
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+
+    const tcs = Object.keys(day.failures).sort((a, b) => {
+      const sa = day.failures[a].status === "new" ? 0 : 1;
+      const sb = day.failures[b].status === "new" ? 0 : 1;
+      return sa - sb || a.localeCompare(b);
+    });
+    for (const tc of tcs) {
+      const f = day.failures[tc];
+      const tr = el("tr");
+      tr.appendChild(el("td", "mono", tc));
+
+      const tdSt = el("td");
+      if (f.status === "new") {
+        tdSt.appendChild(el("span", "badge-new", "신규"));
+      } else {
+        tdSt.appendChild(el("span", "st-ongoing", "지속"));
+        tdSt.appendChild(document.createElement("br"));
+        tdSt.appendChild(el("span", "since", `since ${f.since}`));
+      }
+      tr.appendChild(tdSt);
+
+      tr.appendChild(el("td", "excerpt mono", f.log_excerpt));
+
+      const tdSus = el("td");
+      if (f.suspect_sha) {
+        const shaBtn = el("button", "sha-link mono", f.suspect_sha);
+        shaBtn.type = "button";
+        shaBtn.title = "데일리 리포트에서 분석 보기";
+        shaBtn.addEventListener("click", () => openReport(f.suspect_sha));
+        tdSus.appendChild(shaBtn);
+        tdSus.appendChild(document.createElement("br"));
+        tdSus.appendChild(el("span", "conf", `확신도: ${CONF_LABEL[f.confidence] ?? f.confidence}`));
+      } else {
+        tdSus.appendChild(el("span", "conf", "—"));
+      }
+      tr.appendChild(tdSus);
+
+      const tdLink = el("td");
+      const a = el("a", null, "열기");
+      a.href = f.log_url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      tdLink.appendChild(a);
+      tr.appendChild(tdLink);
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    block.appendChild(table);
+    detail.appendChild(block);
+  }
+
+  if (green.length > 0) {
+    detail.appendChild(el("div", "all-green-line",
+      `✓ 전 TC pass: ${green.map(({ cfg }) => cfg.id).join(", ")}`));
+  }
+  if (notOperating.length > 0) {
+    detail.appendChild(el("div", "not-op-line", `미운영: ${notOperating.join(", ")}`));
+  }
+}
+
+// ---------------------------------------------------------------- 데일리 리포트
+// 외부 라이브러리 없이(폐쇄망) 리포트 md의 부분집합만 렌더링:
+// #~### 제목, 불릿(2단), 인용, 표, 단락, `code`, **bold**, [링크](url).
+// DOM은 전부 createElement/textContent로 구성한다 (innerHTML 미사용).
+function inlineNodes(text) {
+  const frag = document.createDocumentFragment();
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const tok = m[0];
+    if (tok.startsWith("`")) {
+      frag.appendChild(el("code", null, tok.slice(1, -1)));
+    } else if (tok.startsWith("**")) {
+      frag.appendChild(el("strong", null, tok.slice(2, -2)));
+    } else {
+      const mm = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      const a = el("a", null, mm[1]);
+      a.href = mm[2];
+      a.target = "_blank";
+      a.rel = "noopener";
+      frag.appendChild(a);
+    }
+    last = m.index + tok.length;
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
+function renderMarkdown(md) {
+  const root = el("div", "md");
+  let list = null, subList = null, table = null, tbody = null;
+  const endBlocks = () => { list = null; subList = null; table = null; tbody = null; };
+  for (const raw of md.split("\n")) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { endBlocks(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,3}) (.*)$/))) {
+      endBlocks();
+      const h = el("h" + (m[1].length + 1));  // # → h2 … ### → h4
+      h.appendChild(inlineNodes(m[2]));
+      root.appendChild(h);
+    } else if ((m = line.match(/^> ?(.*)$/))) {
+      endBlocks();
+      const q = el("blockquote");
+      q.appendChild(inlineNodes(m[1]));
+      root.appendChild(q);
+    } else if (line.startsWith("|")) {
+      const cells = line.replace(/^\||\|$/g, "").split("|").map((s) => s.trim());
+      if (cells.every((c) => /^:?-{3,}:?$/.test(c))) continue;  // 헤더 구분선
+      const isHeader = !table;
+      if (isHeader) {
+        list = null; subList = null;
+        table = el("table");
+        const wrap = el("div", "md-table-wrap");
+        wrap.appendChild(table);
+        root.appendChild(wrap);
+      }
+      const tr = el("tr");
+      for (const c of cells) {
+        const cell = el(isHeader ? "th" : "td");
+        cell.appendChild(inlineNodes(c));
+        tr.appendChild(cell);
+      }
+      if (isHeader) {
+        const thead = el("thead");
+        thead.appendChild(tr);
+        table.appendChild(thead);
+        tbody = el("tbody");
+        table.appendChild(tbody);
+      } else {
+        tbody.appendChild(tr);
+      }
+    } else if ((m = line.match(/^  - (.*)$/))) {
+      if (list) {
+        if (!subList) {
+          subList = el("ul");
+          (list.lastElementChild ?? list).appendChild(subList);
+        }
+        const li = el("li");
+        li.appendChild(inlineNodes(m[1]));
+        subList.appendChild(li);
+      }
+    } else if ((m = line.match(/^- (.*)$/))) {
+      table = null; tbody = null; subList = null;
+      if (!list) { list = el("ul"); root.appendChild(list); }
+      const li = el("li");
+      li.appendChild(inlineNodes(m[1]));
+      list.appendChild(li);
+    } else {
+      endBlocks();
+      const p = el("p");
+      p.appendChild(inlineNodes(line));
+      root.appendChild(p);
+    }
+  }
+  return root;
+}
+
+async function openReportFile(relPath, anchorSha) {
+  $("report-path").textContent = `reviews/${relPath}`;
+  const body = $("report-body");
+  body.replaceChildren(el("p", "conf", "불러오는 중…"));
+  $("report-overlay").hidden = false;
+  try {
+    const md = await fetchText(new URL(relPath, REPORT_BASE));
+    body.replaceChildren(renderMarkdown(md));
+    if (anchorSha) {
+      // "### {sha}" 제목(h4)으로 스크롤 + 하이라이트
+      const target = [...body.querySelectorAll("h4")]
+        .find((h) => h.textContent.includes(anchorSha));
+      if (target) {
+        target.classList.add("anchor-hit");
+        target.scrollIntoView({ block: "start" });
+      }
+    } else {
+      body.scrollTop = 0;
+    }
+  } catch (err) {
+    body.replaceChildren(
+      el("p", "conf", `리포트를 찾을 수 없습니다: reviews/${relPath} (${err.message})`));
+  }
+}
+
+// 데일리: 선택된 날짜 기준 / 먼슬리: 선택된 날짜가 속한 달 기준
+const openReport = (anchorSha) =>
+  openReportFile(`daily/${state.selectedDate}.md`, anchorSha);
+const openMonthly = () =>
+  openReportFile(`monthly/${state.selectedDate.slice(0, 7)}.md`, null);
+
+function closeReport() { $("report-overlay").hidden = true; }
+$("report-btn").addEventListener("click", () => openReport(null));
+$("monthly-btn").addEventListener("click", openMonthly);
+$("report-close").addEventListener("click", closeReport);
+$("report-overlay").addEventListener("click", (ev) => {
+  if (ev.target === $("report-overlay")) closeReport();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") closeReport();
+});
+
+function renderDateSelect() {
+  const sel = $("date-select");
+  sel.replaceChildren();
+  for (const date of [...state.dates].reverse()) {
+    const o = el("option", null, date);
+    o.value = date;
+    sel.appendChild(o);
+  }
+  sel.value = state.selectedDate;
+  sel.onchange = () => selectDate(sel.value);
+}
+
+function selectDate(date) {
+  state.selectedDate = date;
+  $("date-select").value = date;
+  renderChart();  // 선택 표시선 갱신
+  renderDetail();
+}
+
+function render() {
+  renderStats();
+  renderConfigTable();
+  renderChart();
+  renderTrendMatrix();
+  renderDateSelect();
+  renderDetail();
+}
+
+load().then(render).catch((err) => {
+  const box = $("error-box");
+  box.style.display = "block";
+  box.replaceChildren(
+    el("div", null, `데이터 로드 실패: ${err.message}`),
+    el("div", null, "repo 루트에서 정적 서버로 서빙해야 합니다 — 예: python3 -m http.server 후 /docs/ 접속"),
+  );
+});
+
+$("range-label").textContent = "results/*/index.json 기반";
+</script>
+</body>
+</html>
