@@ -66,8 +66,8 @@ GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가
 (행 클릭으로 전체 합계/구성 전환, 신규 발생일 마커), 전체 구성 × 날짜 매트릭스,
 날짜별 failure 상세(신규 fail 상단 정렬·자동 펼침, suspect sha·확신도, dobee 로그
 링크). suspect sha를 클릭하면 해당일 `reviews/daily/{date}.md` 리포트가 모달로
-열리고 그 변경점 섹션으로 이동합니다. "먼슬리 리뷰" 버튼은 선택된 날짜가 속한
-달의 `reviews/monthly/{YYYY-MM}.md`를 엽니다. 라이트/다크 테마 지원.
+열리고 그 변경점 섹션으로 이동합니다 ("일간 보고" 버튼으로도 열람).
+"월간 리뷰" 버튼은 선택된 날짜가 속한 달의 `reviews/monthly/{YYYY-MM}.md`를 엽니다. 라이트/다크 테마 지원.
 
 ## 예시 데이터 재생성
 

@@ -247,13 +247,17 @@ def build_report(d: date, prev: date | None) -> str:
     fixed_entries: list[tuple[str, Episode]] = []
     ongoing: list[tuple[str, Episode]] = []
     per_cfg_new: list[tuple[str, int]] = []
+    per_cfg_delta: list[tuple[str, int]] = []
     green: list[str] = []
 
     for cfg in CONFIGS:
         active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
         total_fail += len(active)
         if prev:
-            prev_fail += sum(1 for ep in cfg["episodes"] if ep.active_on(prev))
+            cfg_prev = sum(1 for ep in cfg["episodes"] if ep.active_on(prev))
+            prev_fail += cfg_prev
+            if len(active) != cfg_prev:
+                per_cfg_delta.append((cfg["id"], len(active) - cfg_prev))
         news = [ep for ep in active if ep.since == d]
         if news:
             per_cfg_new.append((cfg["id"], len(news)))
@@ -278,6 +282,14 @@ def build_report(d: date, prev: date | None) -> str:
         delta = f" (전일 대비 {'+' if diff > 0 else ''}{diff})" if diff != 0 else " (전일과 동일)"
     L.append(f"- 전체 fail **{total_fail}건**{delta} · 신규 **{len(new_entries)}건** · "
              f"해소 **{len(fixed_entries)}건**")
+    if prev:
+        if per_cfg_delta:
+            per_cfg_delta.sort(key=lambda t: (-t[1], t[0]))
+            L.append("- 전일 대비 증감: " + " · ".join(
+                f"**{cid}** {'+' if n > 0 else ''}{n}" for cid, n in per_cfg_delta)
+                + " (그 외 변동 없음)")
+        else:
+            L.append("- 전일 대비 증감: 전 구성 변동 없음")
     if per_cfg_new:
         L.append("- 구성별 신규: " + " · ".join(f"**{cid}** {n}건" for cid, n in per_cfg_new))
     if green:
