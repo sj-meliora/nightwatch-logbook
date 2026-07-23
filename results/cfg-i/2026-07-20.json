@@ -3,7 +3,6 @@
   "date": "2026-07-20",
   "failures": {
     "TC_CMP_BIOS_140": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "legacy bios: option rom hang on cold boot 1/50",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_BIOS_140",
@@ -12,7 +11,6 @@
       "suspect_sha": null
     },
     "TC_CMP_HOSTA_101": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "host A hotplug: link retrain loop after s3 resume",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_HOSTA_101",
@@ -21,7 +19,6 @@
       "suspect_sha": null
     },
     "TC_CMP_HOSTB_115": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "host B nvme timeout on admin q during boot storm",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_HOSTB_115",
@@ -30,7 +27,6 @@
       "suspect_sha": null
     },
     "TC_CMP_HOSTC_128": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "host C aspm l1.2 entry storm drops io",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_HOSTC_128",
@@ -39,7 +35,6 @@
       "suspect_sha": null
     },
     "TC_CMP_OSX_133": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "os X trim burst causes cmd timeout at qd64",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_OSX_133",
@@ -48,7 +43,6 @@
       "suspect_sha": null
     },
     "TC_CMP_VMD_152": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "vmd passthrough: msix vector loss after reset",
       "log_url": "https://dobee.example.internal/run/8666/tc/TC_CMP_VMD_152",

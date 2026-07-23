@@ -3,7 +3,6 @@
   "date": "2026-07-16",
   "failures": {
     "TC_SMOKE_BOOT_001": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "boot-to-ready 6.2s > smoke budget 5s",
       "log_url": "https://dobee.example.internal/run/4422/tc/TC_SMOKE_BOOT_001",

@@ -3,7 +3,6 @@
   "date": "2026-07-23",
   "failures": {
     "TC_PLR_CAP_021": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "cap discharge curve below spec at 85C",
       "log_url": "https://dobee.example.internal/run/5899/tc/TC_PLR_CAP_021",
@@ -12,7 +11,6 @@
       "suspect_sha": null
     },
     "TC_PLR_SPOR_009": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "spor iteration 412 mount fail, dirty map",
       "log_url": "https://dobee.example.internal/run/5899/tc/TC_PLR_SPOR_009",

@@ -3,7 +3,6 @@
   "date": "2026-07-18",
   "failures": {
     "TC_GCS_HOT_COLD_012": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "gc write amp 4.8 > limit 3.5 under hot/cold mix",
       "log_url": "https://dobee.example.internal/run/5144/tc/TC_GCS_HOT_COLD_012",
@@ -12,7 +11,6 @@
       "suspect_sha": null
     },
     "TC_GCS_RESERVE_031": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "reserve blocks below min watermark after loop 77",
       "log_url": "https://dobee.example.internal/run/5144/tc/TC_GCS_RESERVE_031",
@@ -21,7 +19,6 @@
       "suspect_sha": null
     },
     "TC_GCS_URGENT_027": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "urgent gc misses deadline, host write stall 1.2s",
       "log_url": "https://dobee.example.internal/run/5144/tc/TC_GCS_URGENT_027",

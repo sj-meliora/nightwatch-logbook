@@ -3,7 +3,6 @@
   "date": "2026-07-22",
   "failures": {
     "TC_THM_OSC_011": {
-      "author": "nam.rr",
       "confidence": "unknown",
       "log_excerpt": "throttle oscillation 2Hz between P1/P3",
       "log_url": "https://dobee.example.internal/run/10088/tc/TC_THM_OSC_011",
@@ -12,7 +11,6 @@
       "suspect_sha": "f31c807"
     },
     "TC_THM_SENSOR_024": {
-      "author": null,
       "confidence": null,
       "log_excerpt": "composite temp sensor stuck during thermal ramp",
       "log_url": "https://dobee.example.internal/run/10088/tc/TC_THM_SENSOR_024",

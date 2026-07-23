@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""열흘치 daily regression log 예시 데이터를 생성한다 (구성 11개).
+"""열흘치 daily regression log 예시 데이터를 생성한다 (구성 11개 + 데일리 리포트).
 
 실제 운영에서는 스케줄 워크플로우가 dobee 결과를 파싱해 데일리 파일을
 커밋하지만, 이 스크립트는 대시보드/스키마 검증용 예시 데이터를 만든다.
@@ -8,8 +8,12 @@
 - 데일리 파일은 생성 후 불변, JSON이 source of truth
 - failures는 배열이 아닌 TC 이름 키 객체, 키 정렬 + pretty print
   → git diff가 TC 추가/제거를 사람이 읽을 수 있게 보여준다
-- suspect_sha/author/confidence는 agent 추정 결과로, dobee 사실(로그)과 구분
+- suspect_sha/confidence는 agent 추정 결과로, dobee 사실(로그)과 구분
+- 회사 AI 정책: 개발자 아이디는 repo 데이터에 기록하지 않는다.
+  suspect는 sha로만 기록하고, 분석 의뢰 발송 단계에서 내부 시스템으로
+  sha → 개발자를 조회한다
 - index.json은 데일리 파일에서 파생되는 rollup으로, 매일 재생성
+- reviews/{date}.md는 agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안
 
 사용법: python3 scripts/generate_sample_data.py  (repo 루트에서 실행)
 """
@@ -21,9 +25,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / "results"
+REVIEWS_DIR = REPO_ROOT / "reviews"
 SCHEMA_VERSION = 1
 
 DATES = [date(2026, 7, 14) + timedelta(days=i) for i in range(10)]
+
+CONF_KO = {"high": "높음", "medium": "추정", "unknown": "불명"}
 
 
 @dataclass
@@ -35,7 +42,6 @@ class Episode:
     log_excerpt: str
     # agent 추정 필드 (신규 fail 분석 시점에 채워지고 이후 날짜로 승계)
     suspect_sha: str | None = None
-    author: str | None = None
     confidence: str | None = None
 
     def active_on(self, d: date) -> bool:
@@ -81,27 +87,27 @@ CFG_A = chronic([
             "spor recovery hang at stage 2, ftl_open() no return"),
     Episode("TC_FTL_MAP_141", d_("2026-07-15"), d_("2026-07-20"),
             "map rebuild reads stale l2p page after unclean shutdown",
-            suspect_sha="9e12ab4", author="jung.hh", confidence="medium"),
+            suspect_sha="9e12ab4", confidence="medium"),
     Episode("TC_IO_QD32_055", d_("2026-07-16"), None,
             "hang: qd32 rand write stalls at 97% completion",
-            suspect_sha="4c77f02", author="seo.mm", confidence="unknown"),
+            suspect_sha="4c77f02", confidence="unknown"),
     Episode("TC_META_JOURNAL_019", d_("2026-07-18"), None,
             "journal checkpoint skipped when gc pressure high"),
     Episode("TC_FTL_TRIM_072", d_("2026-07-19"), d_("2026-07-22"),
             "deallocate during gc migrates trimmed block, data resurrect"),
     Episode("TC_IO_MIXED_090", d_("2026-07-20"), None,
             "MISCOMPARE under 70/30 mixed after 2h, lba=0x29ff10",
-            suspect_sha="b8d4310", author="kang.jj", confidence="medium"),
+            suspect_sha="b8d4310", confidence="medium"),
     # 2026-07-23 신규 3건 — 설계 문서 예시 시나리오
     Episode("TC_FTL_GC_017", d_("2026-07-23"), None,
             "ASSERT at gc_victim.c:412: invalid victim block state during gc",
-            suspect_sha="a3f9c21", author="kim.xx", confidence="high"),
+            suspect_sha="a3f9c21", confidence="high"),
     Episode("TC_FTL_MAP_205", d_("2026-07-23"), None,
             "SEGV in map_cache_evict(), map_cache.c:207",
-            suspect_sha="77d0e4f", author="lee.yy", confidence="high"),
+            suspect_sha="77d0e4f", confidence="high"),
     Episode("TC_IO_SEQ_078", d_("2026-07-23"), None,
             "IO latency spike 4200ms > budget 500ms in seq write",
-            suspect_sha="c91b502", author="park.zz", confidence="medium"),
+            suspect_sha="c91b502", confidence="medium"),
 ]
 
 # ---------------------------------------------------------------- cfg-b
@@ -116,12 +122,12 @@ CFG_B = chronic([
             "flush returns before nand program complete (write-through off)"),
     Episode("TC_NVME_RESET_033", d_("2026-07-17"), None,
             "controller reset during io leaves qpair zombie",
-            suspect_sha="f0a9912", author="yoon.ss", confidence="medium"),
+            suspect_sha="f0a9912", confidence="medium"),
     Episode("TC_MAP_REBUILD_058", d_("2026-07-21"), d_("2026-07-23"),
             "rebuild time 41s > budget 30s on 75% full drive"),
     Episode("TC_IO_WRCACHE_012", d_("2026-07-22"), None,
             "write cache disable ignored under sustained seq write",
-            suspect_sha="5b21d9e", author="choi.aa", confidence="medium"),
+            suspect_sha="5b21d9e", confidence="medium"),
 ]
 
 # ---------------------------------------------------------------- cfg-c
@@ -141,7 +147,7 @@ CFG_D = chronic([
     # cfg-a의 TC_FTL_GC_017과 같은 변경점(a3f9c21)이 의심되는 교차 구성 신호
     Episode("TC_GCS_VICTIM_044", d_("2026-07-23"), None,
             "victim pick loops on same block, gc starvation",
-            suspect_sha="a3f9c21", author="kim.xx", confidence="medium"),
+            suspect_sha="a3f9c21", confidence="medium"),
 ]
 
 # ---------------------------------------------------------------- cfg-e
@@ -170,7 +176,7 @@ CFG_G = chronic([
 ]) + [
     Episode("TC_MJ_CKPT_022", d_("2026-07-23"), None,
             "checkpoint skip when gc pressure high, journal wrap",
-            suspect_sha="77d0e4f", author="lee.yy", confidence="medium"),
+            suspect_sha="77d0e4f", confidence="medium"),
 ]
 
 # ---------------------------------------------------------------- cfg-h (전 기간 green)
@@ -201,7 +207,7 @@ CFG_J = chronic([
 CFG_K = [
     Episode("TC_THM_OSC_011", d_("2026-07-22"), None,
             "throttle oscillation 2Hz between P1/P3",
-            suspect_sha="f31c807", author="nam.rr", confidence="unknown"),
+            suspect_sha="f31c807", confidence="unknown"),
     Episode("TC_THM_SENSOR_024", d_("2026-07-22"), None,
             "composite temp sensor stuck during thermal ramp"),
 ]
@@ -232,6 +238,100 @@ def run_id_for(cfg_idx: int, d: date) -> int:
     return 3000 + cfg_idx * 700 + (d - DATES[0]).days * 11
 
 
+# ---------------------------------------------------------------- 리포트
+def build_report(d: date, prev: date | None) -> str:
+    """reviews/{date}.md — agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안."""
+    total_fail = prev_fail = 0
+    new_entries: list[tuple[str, Episode]] = []
+    fixed_entries: list[tuple[str, Episode]] = []
+    ongoing: list[tuple[str, Episode]] = []
+    per_cfg_new: list[tuple[str, int]] = []
+    green: list[str] = []
+
+    for cfg in CONFIGS:
+        active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
+        total_fail += len(active)
+        if prev:
+            prev_fail += sum(1 for ep in cfg["episodes"] if ep.active_on(prev))
+        news = [ep for ep in active if ep.since == d]
+        if news:
+            per_cfg_new.append((cfg["id"], len(news)))
+        new_entries += [(cfg["id"], ep) for ep in news]
+        fixed_entries += [(cfg["id"], ep) for ep in cfg["episodes"] if ep.until == d]
+        ongoing += [(cfg["id"], ep) for ep in active if ep.since < d]
+        if not active:
+            green.append(cfg["id"])
+
+    L: list[str] = []
+    L.append(f"# Daily Regression Review — {d.isoformat()}")
+    L.append("")
+    L.append("> agent 생성 초안 — 당번 검수 후 분석 의뢰를 발송한다. "
+             "회사 AI 정책에 따라 개발자 아이디는 기록하지 않으며, "
+             "의뢰 발송 단계에서 suspect sha로 내부 조회한다.")
+    L.append("")
+    L.append("## 요약")
+    L.append("")
+    delta = ""
+    if prev:
+        diff = total_fail - prev_fail
+        delta = f" (전일 대비 {'+' if diff > 0 else ''}{diff})" if diff != 0 else " (전일과 동일)"
+    L.append(f"- 전체 fail **{total_fail}건**{delta} · 신규 **{len(new_entries)}건** · "
+             f"해소 **{len(fixed_entries)}건**")
+    if per_cfg_new:
+        L.append("- 구성별 신규: " + " · ".join(f"**{cid}** {n}건" for cid, n in per_cfg_new))
+    if green:
+        L.append(f"- fail 없는 구성: {', '.join(green)}")
+    L.append("")
+
+    L.append("## 신규 fail — 변경점별 분석")
+    L.append("")
+    if not new_entries:
+        L.append("신규 fail 없음.")
+        L.append("")
+    else:
+        groups: dict[str | None, list[tuple[str, Episode]]] = {}
+        for cid, ep in new_entries:
+            groups.setdefault(ep.suspect_sha, []).append((cid, ep))
+        shas = [s for s in groups if s is not None] + ([None] if None in groups else [])
+        for sha in shas:
+            entries = groups[sha]
+            L.append(f"### {sha if sha else '원인 미상'}")
+            L.append("")
+            for cid, ep in entries:
+                conf = f" (확신도 {CONF_KO.get(ep.confidence, '불명')})" if ep.confidence else ""
+                L.append(f"- **{cid}** `{ep.tc}`{conf}: {ep.log_excerpt}")
+            L.append("")
+            if sha is None:
+                L.append("변경점 매핑에 실패했다. 로그 기반 수동 분석이 필요하다.")
+            elif len(entries) > 1:
+                cfgs = ", ".join(sorted({cid for cid, _ in entries}))
+                L.append(f"동일 변경점 `{sha}`가 {len(entries)}건의 신규 fail({cfgs})에 "
+                         f"걸려 있다. 교차 구성 회귀 가능성이 높아 우선 분석 대상이다.")
+            else:
+                L.append(f"`{sha}` 변경점에 대한 분석 의뢰 대상이다.")
+            L.append("")
+
+    if fixed_entries:
+        L.append("## 해소")
+        L.append("")
+        for cid, ep in fixed_entries:
+            L.append(f"- **{cid}** `{ep.tc}` — {ep.since.isoformat()}부터 지속되던 fail 해소")
+        L.append("")
+
+    L.append("## 지속 관찰")
+    L.append("")
+    if ongoing:
+        oldest = sorted(ongoing, key=lambda t: t[1].since)[:5]
+        L.append(f"지속 fail {len(ongoing)}건. 최장기 5건:")
+        L.append("")
+        for cid, ep in oldest:
+            L.append(f"- **{cid}** `{ep.tc}` — since {ep.since.isoformat()}")
+    else:
+        L.append("지속 fail 없음.")
+    L.append("")
+    return "\n".join(L)
+
+
 def main() -> None:
     manifest = {"schema_version": SCHEMA_VERSION, "configs": []}
 
@@ -250,7 +350,6 @@ def main() -> None:
                     "log_url": (f"https://dobee.example.internal/run/"
                                 f"{run_id_for(ci, d)}/tc/{ep.tc}"),
                     "suspect_sha": ep.suspect_sha,
-                    "author": ep.author,
                     "confidence": ep.confidence,
                 }
 
@@ -284,6 +383,13 @@ def main() -> None:
     # 대시보드가 구성 목록을 하드코딩하지 않도록 하는 매니페스트
     write_json(RESULTS_DIR / "configs.json", manifest)
     print(f"wrote {RESULTS_DIR / 'configs.json'}")
+
+    # 데일리 리포트 (사람용 리뷰 초안)
+    REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+    for i, d in enumerate(DATES):
+        prev = DATES[i - 1] if i > 0 else None
+        (REVIEWS_DIR / f"{d.isoformat()}.md").write_text(build_report(d, prev), encoding="utf-8")
+    print(f"wrote {len(DATES)} reports to {REVIEWS_DIR}")
 
 
 if __name__ == "__main__":
