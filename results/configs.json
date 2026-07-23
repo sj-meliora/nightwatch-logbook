@@ -1,8 +1,12 @@
 {
   "configs": [
     {
+      "dobee_name": "ftl_full_regr_v2",
       "id": "cfg-a",
       "label": "FTL full regression",
+      "renamed_from": [
+        "ftl_full_regr"
+      ],
       "total": 900
     },
     {
@@ -53,7 +57,14 @@
     {
       "id": "cfg-k",
       "label": "thermal & throttle",
+      "since": "2026-07-18",
       "total": 280
+    },
+    {
+      "id": "cfg-l",
+      "label": "legacy sanitize suite",
+      "retired": "2026-07-20",
+      "total": 190
     }
   ],
   "schema_version": 1

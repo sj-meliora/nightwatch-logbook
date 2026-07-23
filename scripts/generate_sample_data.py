@@ -204,7 +204,7 @@ CFG_J = chronic([
             "wl migration collides with gc, double relocation"),
 ]
 
-# ---------------------------------------------------------------- cfg-k
+# ---------------------------------------------------------------- cfg-k (7/18 운영 시작)
 CFG_K = [
     Episode("TC_THM_OSC_011", d_("2026-07-22"), None,
             "throttle oscillation 2Hz between P1/P3",
@@ -213,8 +213,20 @@ CFG_K = [
             "composite temp sensor stuck during thermal ramp"),
 ]
 
+# ---------------------------------------------------------------- cfg-l (7/20 운영 중단)
+CFG_L = chronic([
+    ("TC_LGC_SAN_003", "2026-06-20", "sanitize block erase leaves residual mapping"),
+    ("TC_LGC_SAN_017", "2026-07-08", "overwrite pass verify timeout at 96%"),
+])
+
+# 구성 생애주기 규칙:
+# - id는 최초 부여 후 불변 (디렉토리명·시계열 연속성의 기준)
+# - dobee 쪽 구성 이름 변경은 dobee_name/renamed_from 메타데이터로만 반영
+# - since = 운영 시작일, retired = 운영 중단일(그날부터 미운영). 데이터 파일은
+#   운영 기간에만 존재하고, 중단돼도 디렉토리·이력은 보존한다
 CONFIGS = [
-    {"id": "cfg-a", "label": "FTL full regression",  "total": 900, "episodes": CFG_A},
+    {"id": "cfg-a", "label": "FTL full regression",  "total": 900, "episodes": CFG_A,
+     "dobee_name": "ftl_full_regr_v2", "renamed_from": ["ftl_full_regr"]},
     {"id": "cfg-b", "label": "NVMe protocol suite",  "total": 420, "episodes": CFG_B},
     {"id": "cfg-c", "label": "smoke suite",          "total": 150, "episodes": CFG_C},
     {"id": "cfg-d", "label": "FTL GC stress",        "total": 300, "episodes": CFG_D},
@@ -224,8 +236,24 @@ CONFIGS = [
     {"id": "cfg-h", "label": "security & sanitize",  "total": 180, "episodes": CFG_H},
     {"id": "cfg-i", "label": "compat matrix",        "total": 600, "episodes": CFG_I},
     {"id": "cfg-j", "label": "wear leveling soak",   "total": 220, "episodes": CFG_J},
-    {"id": "cfg-k", "label": "thermal & throttle",   "total": 280, "episodes": CFG_K},
+    {"id": "cfg-k", "label": "thermal & throttle",   "total": 280, "episodes": CFG_K,
+     "since": "2026-07-18"},
+    {"id": "cfg-l", "label": "legacy sanitize suite", "total": 190, "episodes": CFG_L,
+     "retired": "2026-07-20"},
 ]
+
+
+def op_on(cfg: dict, d: date) -> bool:
+    """해당 일자에 구성이 운영 중인가 (since <= d < retired)."""
+    if "since" in cfg and d < d_(cfg["since"]):
+        return False
+    if "retired" in cfg and d >= d_(cfg["retired"]):
+        return False
+    return True
+
+
+def op_dates(cfg: dict, dates: list[date]) -> list[date]:
+    return [d for d in dates if op_on(cfg, d)]
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -251,9 +279,11 @@ def build_report(d: date, prev: date | None) -> str:
     green: list[str] = []
 
     for cfg in CONFIGS:
+        if not op_on(cfg, d):
+            continue
         active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
         total_fail += len(active)
-        if prev:
+        if prev and op_on(cfg, prev):  # 전일도 운영된 구성만 like-for-like 비교
             cfg_prev = sum(1 for ep in cfg["episodes"] if ep.active_on(prev))
             prev_fail += cfg_prev
             if len(active) != cfg_prev:
@@ -294,6 +324,13 @@ def build_report(d: date, prev: date | None) -> str:
         L.append("- 구성별 신규: " + " · ".join(f"**{cid}** {n}건" for cid, n in per_cfg_new))
     if green:
         L.append(f"- fail 없는 구성: {', '.join(green)}")
+    lifecycle = [f"**{cfg['id']}** 운영 시작" for cfg in CONFIGS
+                 if cfg.get("since") == d.isoformat()]
+    lifecycle += [f"**{cfg['id']}** 운영 중단" for cfg in CONFIGS
+                  if cfg.get("retired") == d.isoformat()]
+    if lifecycle:
+        L.append("- 구성 변경: " + " · ".join(lifecycle)
+                 + " (전일 대비 수치는 양일 모두 운영된 구성 기준)")
     L.append("")
 
     L.append("## 신규 fail — 변경점별 분석")
@@ -362,12 +399,21 @@ def build_monthly_report(month_dates: list[date]) -> str:
     chronic_all: list[tuple[str, Episode]] = []
 
     for cfg in CONFIGS:
+        ods = op_dates(cfg, month_dates)
+        if not ods:
+            continue
+        c_first, c_last = ods[0], ods[-1]  # 이 구성의 월내 운영 구간
+        name = cfg["id"]
+        if "since" in cfg and d_(cfg["since"]) == c_first and c_first != first:
+            name += f" ({c_first.strftime('%m/%d')}~)"
+        if "retired" in cfg and c_last != last:
+            name += f" (~{c_last.strftime('%m/%d')})"
         eps = cfg["episodes"]
-        start_fail = sum(1 for ep in eps if ep.active_on(first))
-        end_fail = sum(1 for ep in eps if ep.active_on(last))
-        news = [ep for ep in eps if first <= ep.since <= last]
-        fixed = [ep for ep in eps if ep.until and first <= ep.until <= last]
-        rows.append((cfg["id"], start_fail, end_fail, len(news), len(fixed)))
+        start_fail = sum(1 for ep in eps if ep.active_on(c_first))
+        end_fail = sum(1 for ep in eps if ep.active_on(c_last))
+        news = [ep for ep in eps if c_first <= ep.since <= c_last]
+        fixed = [ep for ep in eps if ep.until and c_first <= ep.until <= c_last]
+        rows.append((name, start_fail, end_fail, len(news), len(fixed)))
         total_new += len(news)
         total_fixed += len(fixed)
         for ep in news:
@@ -378,9 +424,11 @@ def build_monthly_report(month_dates: list[date]) -> str:
             else:
                 unmapped.append((cfg["id"], ep))
         chronic_all += [(cfg["id"], ep) for ep in eps
-                        if ep.active_on(first) and ep.active_on(last) and ep.since < first]
+                        if ep.active_on(c_first) and ep.active_on(c_last)
+                        and ep.since < c_first]
 
-    day_totals = [sum(1 for cfg in CONFIGS for ep in cfg["episodes"] if ep.active_on(d))
+    day_totals = [sum(1 for cfg in CONFIGS if op_on(cfg, d)
+                      for ep in cfg["episodes"] if ep.active_on(d))
                   for d in month_dates]
     mapped = total_new - len(unmapped)
     cover = round(mapped / total_new * 100) if total_new else 0
@@ -451,7 +499,7 @@ def main() -> None:
         cfg_dir = RESULTS_DIR / cfg["id"]
         rollup_days = []
 
-        for d in DATES:
+        for d in op_dates(cfg, DATES):  # 운영 기간의 데일리 파일만 존재
             active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
             failures = {}
             for ep in active:
@@ -488,8 +536,12 @@ def main() -> None:
             "updated": DATES[-1].isoformat(),
             "days": rollup_days,
         })
-        manifest["configs"].append({"id": cfg["id"], "label": cfg["label"], "total": cfg["total"]})
-        print(f"{cfg['id']}: {len(DATES)} daily files, "
+        entry = {"id": cfg["id"], "label": cfg["label"], "total": cfg["total"]}
+        for key in ("dobee_name", "renamed_from", "since", "retired"):
+            if key in cfg:
+                entry[key] = cfg[key]
+        manifest["configs"].append(entry)
+        print(f"{cfg['id']}: {len(rollup_days)} daily files, "
               f"fail {rollup_days[0]['fail']} -> {rollup_days[-1]['fail']}")
 
     # 대시보드가 구성 목록을 하드코딩하지 않도록 하는 매니페스트

@@ -2,34 +2,6 @@
   "config": "cfg-k",
   "days": [
     {
-      "date": "2026-07-14",
-      "fail": 0,
-      "new_fail": 0,
-      "pass": 280,
-      "total": 280
-    },
-    {
-      "date": "2026-07-15",
-      "fail": 0,
-      "new_fail": 0,
-      "pass": 280,
-      "total": 280
-    },
-    {
-      "date": "2026-07-16",
-      "fail": 0,
-      "new_fail": 0,
-      "pass": 280,
-      "total": 280
-    },
-    {
-      "date": "2026-07-17",
-      "fail": 0,
-      "new_fail": 0,
-      "pass": 280,
-      "total": 280
-    },
-    {
       "date": "2026-07-18",
       "fail": 0,
       "new_fail": 0,

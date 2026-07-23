@@ -110,6 +110,11 @@
   #config-table .new-cell { color: var(--critical); font-weight: 600; }
   #config-table .spark { display: block; }
   #config-table .green-dot { color: var(--good-text); }
+  #config-table tbody tr.retired { opacity: 0.55; }
+  .lifecycle-chip {
+    color: var(--muted); font-size: 11px; white-space: nowrap;
+    border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; margin-left: 8px;
+  }
 
   /* ---- 추이 차트 ---- */
   #chart-wrap { position: relative; }
@@ -166,6 +171,7 @@
   .conf { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
   .all-green-line { color: var(--good-text); font-size: 13px; margin-top: 12px;
                     border-top: 1px solid var(--grid); padding-top: 10px; }
+  .not-op-line { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
   a { color: var(--accent); }
 
   #error-box { display: none; border: 1px solid var(--critical); color: var(--critical);
@@ -332,7 +338,9 @@ async function load() {
   await Promise.all(state.configs.map(async (cfg) => {
     state.index[cfg.id] = await fetchJson(new URL(`${cfg.id}/index.json`, DATA_BASE));
   }));
-  state.dates = state.index[state.configs[0].id].days.map((d) => d.date);
+  // 날짜 축 = 전 구성 날짜의 합집합 — 중간 추가/중단 구성은 일부 날짜가 없다
+  state.dates = [...new Set(Object.values(state.index)
+    .flatMap((ix) => ix.days.map((d) => d.date)))].sort();
   state.selectedDate = state.dates[state.dates.length - 1];
 }
 
@@ -344,21 +352,26 @@ async function dailyOf(cfgId, date) {
   return state.daily[key];
 }
 
+// 해당 날짜에 미운영(추가 전/중단 후)이면 undefined — 호출측은 결손 허용
 const dayRow = (cfgId, date) => state.index[cfgId].days.find((d) => d.date === date);
 const mmdd = (date) => date.slice(5).replace("-", "/");
 
-// 차트에 그릴 시계열: 구성 하나 또는 전체 합계
+// 차트에 그릴 시계열: 구성 하나 또는 전체 합계. 미운영 날짜는 fail: null
 function seriesOf(cfgId) {
   if (cfgId !== AGG) {
-    return state.index[cfgId].days.map((d) => ({ date: d.date, fail: d.fail, new_fail: d.new_fail }));
+    return state.dates.map((date) => {
+      const r = dayRow(cfgId, date);
+      return r ? { date, fail: r.fail, new_fail: r.new_fail }
+               : { date, fail: null, new_fail: 0 };
+    });
   }
   return state.dates.map((date) => {
-    let fail = 0, nf = 0;
+    let fail = 0, nf = 0, any = false;
     for (const c of state.configs) {
       const r = dayRow(c.id, date);
-      fail += r.fail; nf += r.new_fail;
+      if (r) { any = true; fail += r.fail; nf += r.new_fail; }
     }
-    return { date, fail, new_fail: nf };
+    return { date, fail: any ? fail : null, new_fail: nf };
   });
 }
 
@@ -366,12 +379,16 @@ function seriesOf(cfgId) {
 function renderStats() {
   const last = state.dates[state.dates.length - 1];
   const prev = state.dates[state.dates.length - 2];
-  const sum = (date, k) => state.configs.reduce((a, c) => a + dayRow(c.id, date)[k], 0);
+  const sum = (date, k) => state.configs.reduce((a, c) => {
+    const r = dayRow(c.id, date);
+    return a + (r ? r[k] : 0);
+  }, 0);
 
   const failNow = sum(last, "fail");
   const failDelta = failNow - sum(prev, "fail");
   const newNow = sum(last, "new_fail");
-  const green = state.configs.filter((c) => dayRow(c.id, last).fail === 0).length;
+  const operating = state.configs.filter((c) => dayRow(c.id, last));
+  const green = operating.filter((c) => dayRow(c.id, last).fail === 0).length;
 
   const stats = $("stats");
   stats.replaceChildren();
@@ -386,7 +403,8 @@ function renderStats() {
                `${failDelta > 0 ? "▲" : failDelta < 0 ? "▼" : "—"} ${Math.abs(failDelta)} vs 전일`);
   tile(`전체 fail (${mmdd(last)})`, failNow, d);
   tile("신규 fail", newNow, el("div", "delta", "전 구성 합계"));
-  tile("fail 없는 구성", `${green} / ${state.configs.length}`, el("div", "delta", "오늘 기준"));
+  tile("fail 없는 구성", `${green} / ${operating.length}`,
+       el("div", "delta", "오늘 운영 구성 기준"));
 }
 
 // ---------------------------------------------------------------- 구성 현황
@@ -429,10 +447,12 @@ function renderConfigTable() {
 
   const rows = state.configs.map((cfg) => {
     const now = dayRow(cfg.id, last), before = dayRow(cfg.id, prev);
-    return { cfg, now, delta: now.fail - before.fail };
-  }).sort((a, b) => b.now.new_fail - a.now.new_fail
+    return { cfg, now,
+             delta: now && before ? now.fail - before.fail : 0 };
+  }).sort((a, b) => (a.now ? 0 : 1) - (b.now ? 0 : 1)  // 중단 구성은 맨 아래
+                 || (b.now?.new_fail ?? 0) - (a.now?.new_fail ?? 0)
                  || b.delta - a.delta
-                 || b.now.fail - a.now.fail
+                 || (b.now?.fail ?? 0) - (a.now?.fail ?? 0)
                  || a.cfg.id.localeCompare(b.cfg.id));
 
   const tbody = el("tbody");
@@ -440,16 +460,24 @@ function renderConfigTable() {
     const tr = el("tr");
     tr.dataset.cfg = cfg.id;
     if (state.selectedConfig === cfg.id) tr.classList.add("selected");
+    if (!now) tr.classList.add("retired");
 
     const tdName = el("td");
     tdName.appendChild(el("span", "mono", cfg.id));
     tdName.appendChild(el("span", "cfg-label", `  ${cfg.label}`));
+    if (cfg.retired) {
+      tdName.appendChild(el("span", "lifecycle-chip", `중단 ${mmdd(cfg.retired)}`));
+    } else if (cfg.since && cfg.since > state.dates[0]) {
+      tdName.appendChild(el("span", "lifecycle-chip", `${mmdd(cfg.since)}~ 운영`));
+    }
     tr.appendChild(tdName);
 
     tr.appendChild(el("td", "num", String(cfg.total)));
 
-    const tdFail = el("td", "num" + (now.fail === 0 ? " zero" : ""));
-    if (now.fail === 0) {
+    const tdFail = el("td", "num" + (now?.fail === 0 ? " zero" : ""));
+    if (!now) {
+      tdFail.appendChild(el("span", "zero", "—"));
+    } else if (now.fail === 0) {
       tdFail.appendChild(el("span", "green-dot", "✓ 0"));
     } else {
       tdFail.textContent = String(now.fail);
@@ -458,10 +486,10 @@ function renderConfigTable() {
 
     const cls = delta > 0 ? "delta-up" : delta < 0 ? "delta-down" : "delta-flat";
     tr.appendChild(el("td", `num ${cls}`,
-      delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "—"));
+      !now ? "—" : delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "—"));
 
-    tr.appendChild(el("td", "num" + (now.new_fail ? " new-cell" : " zero"),
-      now.new_fail ? String(now.new_fail) : "·"));
+    tr.appendChild(el("td", "num" + (now?.new_fail ? " new-cell" : " zero"),
+      now?.new_fail ? String(now.new_fail) : "·"));
 
     const tdSpark = el("td");
     tdSpark.appendChild(sparkline(cfg.id));
@@ -497,7 +525,7 @@ function renderChart() {
   svg.replaceChildren();
   svg.setAttribute("viewBox", `0 0 ${CH.w} ${CH.h}`);
 
-  const maxFail = Math.max(1, ...series.map((d) => d.fail));
+  const maxFail = Math.max(1, ...series.filter((d) => d.fail !== null).map((d) => d.fail));
   const step = niceStep(maxFail);
   const yMax = Math.max(step, Math.ceil(maxFail / step) * step);
   const x = (i) => CH.left + (i * (CH.w - CH.left - CH.right)) / (series.length - 1);
@@ -532,25 +560,32 @@ function renderChart() {
     stroke: css("--muted"), "stroke-width": 1, visibility: "hidden" });
   svg.appendChild(crosshair);
 
-  // 단일 시리즈: 2px 라인 + 신규 fail 발생일 마커 + 끝점 마커 + 직접 라벨
-  svg.appendChild(svgEl("path", {
-    d: series.map((d, i) => `${i ? "L" : "M"}${x(i)},${y(d.fail)}`).join(""),
-    fill: "none", stroke: accent, "stroke-width": 2,
-    "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  // 단일 시리즈: 2px 라인(미운영 구간은 끊김) + 신규 fail 마커 + 끝점 라벨
+  let dPath = "", pen = false;
   series.forEach((d, i) => {
-    if (d.new_fail > 0) {
+    if (d.fail === null) { pen = false; return; }
+    dPath += `${pen ? "L" : "M"}${x(i)},${y(d.fail)}`;
+    pen = true;
+  });
+  svg.appendChild(svgEl("path", { d: dPath, fill: "none", stroke: accent,
+    "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  series.forEach((d, i) => {
+    if (d.fail !== null && d.new_fail > 0) {
       svg.appendChild(svgEl("circle", { cx: x(i), cy: y(d.fail), r: 4,
         fill: css("--critical"), stroke: surface, "stroke-width": 2 }));
     }
   });
-  const li = series.length - 1;
-  if (series[li].new_fail === 0) {
-    svg.appendChild(svgEl("circle", { cx: x(li), cy: y(series[li].fail), r: 4,
-      fill: accent, stroke: surface, "stroke-width": 2 }));
+  let li = series.length - 1;
+  while (li >= 0 && series[li].fail === null) li--;  // 중단 구성: 마지막 데이터 지점
+  if (li >= 0) {
+    if (series[li].new_fail === 0) {
+      svg.appendChild(svgEl("circle", { cx: x(li), cy: y(series[li].fail), r: 4,
+        fill: accent, stroke: surface, "stroke-width": 2 }));
+    }
+    svg.appendChild(Object.assign(svgEl("text", { x: x(li) + 10, y: y(series[li].fail) + 4,
+      "font-size": 12, fill: css("--ink-2"),
+      style: "font-variant-numeric: tabular-nums" }), { textContent: String(series[li].fail) }));
   }
-  svg.appendChild(Object.assign(svgEl("text", { x: x(li) + 10, y: y(series[li].fail) + 4,
-    "font-size": 12, fill: css("--ink-2"),
-    style: "font-variant-numeric: tabular-nums" }), { textContent: String(series[li].fail) }));
 
   // hover 레이어: 크로스헤어가 X를 찾는다
   const overlay = svgEl("rect", { x: CH.left, y: CH.top,
@@ -578,10 +613,14 @@ function renderChart() {
 
     tooltip.replaceChildren(el("div", "tt-date", series[i].date));
     const r1 = el("div", "tt-row");
-    r1.appendChild(el("span", "tt-val", String(series[i].fail)));
-    r1.appendChild(el("span", "tt-name", "fail"));
+    if (series[i].fail === null) {
+      r1.appendChild(el("span", "tt-name", "미운영"));
+    } else {
+      r1.appendChild(el("span", "tt-val", String(series[i].fail)));
+      r1.appendChild(el("span", "tt-name", "fail"));
+    }
     tooltip.appendChild(r1);
-    if (series[i].new_fail > 0) {
+    if (series[i].fail !== null && series[i].new_fail > 0) {
       const r2 = el("div", "tt-row");
       r2.appendChild(el("span", "tt-new", `신규 ${series[i].new_fail}`));
       tooltip.appendChild(r2);
@@ -622,6 +661,12 @@ function renderTrendMatrix() {
     tr.appendChild(tdName);
     for (const date of state.dates) {
       const r = dayRow(cfg.id, date);
+      if (!r) {  // 미운영 (추가 전 / 중단 후)
+        const td = el("td", "num zero", "—");
+        td.title = "미운영";
+        tr.appendChild(td);
+        continue;
+      }
       const td = el("td", "num" + (r.new_fail > 0 ? " has-new" : r.fail === 0 ? " zero" : ""),
         r.fail === 0 ? "·" : String(r.fail));
       if (r.new_fail > 0) td.title = `신규 ${r.new_fail}`;
@@ -637,11 +682,16 @@ async function renderDetail() {
   const detail = $("detail");
   detail.replaceChildren();
 
+  // 미운영 구성은 index rollup으로 사전 판별 — 데일리 파일 fetch 자체를 생략
   const days = await Promise.all(
-    state.configs.map((cfg) => dailyOf(cfg.id, state.selectedDate)));
+    state.configs.map((cfg) => dayRow(cfg.id, state.selectedDate)
+      ? dailyOf(cfg.id, state.selectedDate).catch(() => null)
+      : Promise.resolve(null)));
   const withFail = [];
   const green = [];
+  const notOperating = [];
   state.configs.forEach((cfg, i) => {
+    if (!days[i]) { notOperating.push(cfg.id); return; }
     (days[i].summary.fail > 0 ? withFail : green).push({ cfg, day: days[i] });
   });
   // 신규 fail 있는 구성 먼저
@@ -726,6 +776,9 @@ async function renderDetail() {
   if (green.length > 0) {
     detail.appendChild(el("div", "all-green-line",
       `✓ 전 TC pass: ${green.map(({ cfg }) => cfg.id).join(", ")}`));
+  }
+  if (notOperating.length > 0) {
+    detail.appendChild(el("div", "not-op-line", `미운영: ${notOperating.join(", ")}`));
   }
 }
 
