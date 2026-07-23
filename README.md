@@ -11,7 +11,8 @@ results/
 ├─ {config}/{YYYY-MM-DD}.json    # 데일리 원본 — 생성 후 불변, JSON이 source of truth
 └─ {config}/index.json           # 파생 rollup — 날짜별 summary 배열, 매일 재생성
 reviews/
-└─ {YYYY-MM-DD}.md               # agent 생성 데일리 리뷰 초안 (사람용, 대시보드에서 열람)
+├─ daily/{YYYY-MM-DD}.md         # agent 생성 데일리 리뷰 초안 (당번 검수용)
+└─ monthly/{YYYY-MM}.md          # 월간 회고/성과 보고용 리뷰 (매핑 커버리지 포함)
 docs/
 └─ index.html                    # 정적 대시보드 (의존성 없는 단일 파일, GitHub Pages용)
 scripts/
@@ -64,8 +65,9 @@ GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가
 기능: 구성 현황 테이블(신규·증감 순 정렬, 행별 스파크라인), fail 추이 차트
 (행 클릭으로 전체 합계/구성 전환, 신규 발생일 마커), 전체 구성 × 날짜 매트릭스,
 날짜별 failure 상세(신규 fail 상단 정렬·자동 펼침, suspect sha·확신도, dobee 로그
-링크). suspect sha를 클릭하면 해당일 `reviews/{date}.md` 리포트가 모달로 열리고
-그 변경점 섹션으로 이동합니다. 라이트/다크 테마 지원.
+링크). suspect sha를 클릭하면 해당일 `reviews/daily/{date}.md` 리포트가 모달로
+열리고 그 변경점 섹션으로 이동합니다. "먼슬리 리뷰" 버튼은 선택된 날짜가 속한
+달의 `reviews/monthly/{YYYY-MM}.md`를 엽니다. 라이트/다크 테마 지원.
 
 ## 예시 데이터 재생성
 

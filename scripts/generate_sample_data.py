@@ -13,7 +13,8 @@
   suspect는 sha로만 기록하고, 분석 의뢰 발송 단계에서 내부 시스템으로
   sha → 개발자를 조회한다
 - index.json은 데일리 파일에서 파생되는 rollup으로, 매일 재생성
-- reviews/{date}.md는 agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안
+- reviews/daily/{date}.md는 agent가 매일 생성하는 당번 검수용 리뷰 초안
+- reviews/monthly/{YYYY-MM}.md는 월간 회고/성과 보고용 리뷰 (매핑 커버리지 포함)
 
 사용법: python3 scripts/generate_sample_data.py  (repo 루트에서 실행)
 """
@@ -240,7 +241,7 @@ def run_id_for(cfg_idx: int, d: date) -> int:
 
 # ---------------------------------------------------------------- 리포트
 def build_report(d: date, prev: date | None) -> str:
-    """reviews/{date}.md — agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안."""
+    """reviews/daily/{date}.md — agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안."""
     total_fail = prev_fail = 0
     new_entries: list[tuple[str, Episode]] = []
     fixed_entries: list[tuple[str, Episode]] = []
@@ -332,6 +333,105 @@ def build_report(d: date, prev: date | None) -> str:
     return "\n".join(L)
 
 
+def build_monthly_report(month_dates: list[date]) -> str:
+    """reviews/monthly/{YYYY-MM}.md — 월간 회고/성과 보고용 리뷰.
+
+    데일리와 달리 의뢰 액션이 아닌 집계가 목적: 구성별 월초→월말 현황,
+    변경점 매핑 커버리지(정확도 측정 근거), 교차 구성 회귀 이력, 만성 fail.
+    """
+    first, last = month_dates[0], month_dates[-1]
+    ym = first.strftime("%Y-%m")
+
+    rows = []            # (cfg_id, 월초 fail, 월말 fail, 신규, 해소)
+    total_new = total_fixed = 0
+    new_by_sha: dict[str, list[tuple[str, date, Episode]]] = {}
+    conf_count: dict[str, int] = {}
+    unmapped: list[tuple[str, Episode]] = []
+    chronic_all: list[tuple[str, Episode]] = []
+
+    for cfg in CONFIGS:
+        eps = cfg["episodes"]
+        start_fail = sum(1 for ep in eps if ep.active_on(first))
+        end_fail = sum(1 for ep in eps if ep.active_on(last))
+        news = [ep for ep in eps if first <= ep.since <= last]
+        fixed = [ep for ep in eps if ep.until and first <= ep.until <= last]
+        rows.append((cfg["id"], start_fail, end_fail, len(news), len(fixed)))
+        total_new += len(news)
+        total_fixed += len(fixed)
+        for ep in news:
+            if ep.suspect_sha:
+                new_by_sha.setdefault(ep.suspect_sha, []).append((cfg["id"], ep.since, ep))
+                conf_count[ep.confidence or "unknown"] = \
+                    conf_count.get(ep.confidence or "unknown", 0) + 1
+            else:
+                unmapped.append((cfg["id"], ep))
+        chronic_all += [(cfg["id"], ep) for ep in eps
+                        if ep.active_on(first) and ep.active_on(last) and ep.since < first]
+
+    day_totals = [sum(1 for cfg in CONFIGS for ep in cfg["episodes"] if ep.active_on(d))
+                  for d in month_dates]
+    mapped = total_new - len(unmapped)
+    cover = round(mapped / total_new * 100) if total_new else 0
+
+    L: list[str] = []
+    L.append(f"# Monthly Regression Review — {ym}")
+    L.append("")
+    L.append(f"> agent 생성 초안 — 월간 회고/성과 보고용. 데이터 범위: "
+             f"{first.isoformat()} ~ {last.isoformat()} ({len(month_dates)}일). "
+             "회사 AI 정책에 따라 개발자 아이디는 기록하지 않는다.")
+    L.append("")
+    L.append("## 월간 요약")
+    L.append("")
+    L.append(f"- 전체 fail: 월초 **{day_totals[0]}건** → 월말 **{day_totals[-1]}건** "
+             f"(최저 {min(day_totals)} · 최고 {max(day_totals)})")
+    L.append(f"- 신규 **{total_new}건** · 해소 **{total_fixed}건**")
+    conf_str = " · ".join(f"{CONF_KO.get(k, k)} {v}" for k, v in
+                          sorted(conf_count.items(),
+                                 key=lambda kv: ["high", "medium", "unknown"].index(kv[0])))
+    L.append(f"- 변경점 매핑: 신규 {total_new}건 중 **{mapped}건 매핑 ({cover}%)**"
+             + (f" — 확신도 {conf_str}" if conf_str else ""))
+    L.append("")
+
+    L.append("## 구성별 현황")
+    L.append("")
+    L.append("| 구성 | 월초 fail | 월말 fail | 신규 | 해소 |")
+    L.append("|---|---|---|---|---|")
+    for cid, s, e, n, f in rows:
+        L.append(f"| {cid} | {s} | {e} | {n if n else '·'} | {f if f else '·'} |")
+    L.append("")
+
+    L.append("## 변경점별 신규 fail 이력")
+    L.append("")
+    if new_by_sha:
+        for sha, entries in sorted(new_by_sha.items(),
+                                   key=lambda kv: (min(e[1] for e in kv[1]), kv[0])):
+            cfgs = sorted({cid for cid, _, _ in entries})
+            dates_s = sorted({s.strftime("%m/%d") for _, s, _ in entries})
+            cross = " — **교차 구성 회귀**" if len(cfgs) > 1 else ""
+            L.append(f"- `{sha}` ({', '.join(dates_s)}) · {len(entries)}건 · "
+                     f"{', '.join(cfgs)}{cross}")
+            for cid, _, ep in entries:
+                L.append(f"  - {cid} `{ep.tc}` (확신도 {CONF_KO.get(ep.confidence, '불명')})")
+    else:
+        L.append("매핑된 신규 fail 없음.")
+    L.append("")
+    if unmapped:
+        L.append(f"원인 미상 신규 {len(unmapped)}건 — 매핑 실패 사례로 회고 대상:")
+        L.append("")
+        for cid, ep in unmapped:
+            L.append(f"- {cid} `{ep.tc}` ({ep.since.strftime('%m/%d')})")
+        L.append("")
+
+    L.append("## 만성 fail (월 전체 지속)")
+    L.append("")
+    L.append(f"월초부터 월말까지 계속 fail인 TC **{len(chronic_all)}건**. 최장기 5건:")
+    L.append("")
+    for cid, ep in sorted(chronic_all, key=lambda t: t[1].since)[:5]:
+        L.append(f"- **{cid}** `{ep.tc}` — since {ep.since.isoformat()}")
+    L.append("")
+    return "\n".join(L)
+
+
 def main() -> None:
     manifest = {"schema_version": SCHEMA_VERSION, "configs": []}
 
@@ -384,12 +484,24 @@ def main() -> None:
     write_json(RESULTS_DIR / "configs.json", manifest)
     print(f"wrote {RESULTS_DIR / 'configs.json'}")
 
-    # 데일리 리포트 (사람용 리뷰 초안)
-    REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+    # 데일리 리포트 (당번 검수용 리뷰 초안)
+    daily_dir = REVIEWS_DIR / "daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
     for i, d in enumerate(DATES):
         prev = DATES[i - 1] if i > 0 else None
-        (REVIEWS_DIR / f"{d.isoformat()}.md").write_text(build_report(d, prev), encoding="utf-8")
-    print(f"wrote {len(DATES)} reports to {REVIEWS_DIR}")
+        (daily_dir / f"{d.isoformat()}.md").write_text(build_report(d, prev), encoding="utf-8")
+    print(f"wrote {len(DATES)} daily reports to {daily_dir}")
+
+    # 먼슬리 리뷰 (회고/성과 보고용) — 월 단위로 그룹핑해 생성
+    monthly_dir = REVIEWS_DIR / "monthly"
+    monthly_dir.mkdir(parents=True, exist_ok=True)
+    months: dict[str, list[date]] = {}
+    for d in DATES:
+        months.setdefault(d.strftime("%Y-%m"), []).append(d)
+    for ym, month_dates in months.items():
+        (monthly_dir / f"{ym}.md").write_text(build_monthly_report(month_dates),
+                                              encoding="utf-8")
+    print(f"wrote {len(months)} monthly reviews to {monthly_dir}")
 
 
 if __name__ == "__main__":
