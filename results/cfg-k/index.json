@@ -1,0 +1,78 @@
+{
+  "config": "cfg-k",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-20",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-21",
+      "fail": 0,
+      "new_fail": 0,
+      "pass": 280,
+      "total": 280
+    },
+    {
+      "date": "2026-07-22",
+      "fail": 2,
+      "new_fail": 2,
+      "pass": 278,
+      "total": 280
+    },
+    {
+      "date": "2026-07-23",
+      "fail": 2,
+      "new_fail": 0,
+      "pass": 278,
+      "total": 280
+    }
+  ],
+  "label": "thermal & throttle",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}

@@ -16,10 +16,9 @@
     --grid:        #e1e0d9;
     --baseline:    #c3c2b7;
     --border:      rgba(11,11,11,0.10);
-    --series-a:    #2a78d6;  /* cfg-a: blue */
-    --series-b:    #eb6834;  /* cfg-b: orange */
-    --series-c:    #1baf7a;  /* cfg-c: aqua */
-    --critical:    #d03b3b;  /* 신규 fail 배지 */
+    --wash:        rgba(11,11,11,0.035);
+    --accent:      #2a78d6;
+    --critical:    #d03b3b;  /* 신규 fail */
     --good-text:   #006300;
   }
   @media (prefers-color-scheme: dark) {
@@ -33,9 +32,8 @@
       --grid:      #2c2c2a;
       --baseline:  #383835;
       --border:    rgba(255,255,255,0.10);
-      --series-a:  #3987e5;
-      --series-b:  #d95926;
-      --series-c:  #199e70;
+      --wash:      rgba(255,255,255,0.05);
+      --accent:    #3987e5;
       --critical:  #d03b3b;
       --good-text: #0ca30c;
     }
@@ -50,9 +48,8 @@
     --grid:      #2c2c2a;
     --baseline:  #383835;
     --border:    rgba(255,255,255,0.10);
-    --series-a:  #3987e5;
-    --series-b:  #d95926;
-    --series-c:  #199e70;
+    --wash:      rgba(255,255,255,0.05);
+    --accent:    #3987e5;
     --critical:  #d03b3b;
     --good-text: #0ca30c;
   }
@@ -96,10 +93,25 @@
   .tile .delta.up   { color: var(--critical); }
   .tile .delta.down { color: var(--good-text); }
 
-  /* ---- 차트 ---- */
-  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; color: var(--ink-2); }
-  .legend .item { display: inline-flex; align-items: center; gap: 7px; }
-  .legend .key { width: 18px; height: 0; border-top: 2.5px solid; border-radius: 2px; }
+  /* ---- 구성 현황 테이블 ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-top: 1px solid var(--grid); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+
+  #config-table tbody tr { cursor: pointer; }
+  #config-table tbody tr:hover { background: var(--wash); }
+  #config-table tbody tr.selected { background: var(--wash); box-shadow: inset 3px 0 0 var(--accent); }
+  #config-table .cfg-label { color: var(--ink-2); }
+  #config-table .delta-up { color: var(--critical); }
+  #config-table .delta-down { color: var(--good-text); }
+  #config-table .delta-flat, #config-table .zero { color: var(--muted); }
+  #config-table .new-cell { color: var(--critical); font-weight: 600; }
+  #config-table .spark { display: block; }
+  #config-table .green-dot { color: var(--good-text); }
+
+  /* ---- 추이 차트 ---- */
   #chart-wrap { position: relative; }
   #chart { display: block; width: 100%; height: auto; }
   #chart text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -107,30 +119,42 @@
     position: absolute; pointer-events: none; display: none; z-index: 3;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.14);
-    padding: 8px 12px; min-width: 150px; font-size: 12.5px;
+    padding: 8px 12px; min-width: 140px; font-size: 12.5px;
   }
   #tooltip .tt-date { color: var(--muted); margin-bottom: 4px; }
-  #tooltip .tt-row { display: flex; align-items: center; gap: 7px; margin: 2px 0; }
-  #tooltip .tt-key { width: 14px; height: 0; border-top: 2.5px solid; border-radius: 2px; }
+  #tooltip .tt-row { display: flex; align-items: baseline; gap: 7px; margin: 2px 0; }
   #tooltip .tt-val { font-weight: 600; font-variant-numeric: tabular-nums; }
   #tooltip .tt-name { color: var(--ink-2); }
-  #tooltip .tt-new { color: var(--critical); margin-left: auto; padding-left: 8px; }
+  #tooltip .tt-new { color: var(--critical); }
 
-  /* ---- 상세 테이블 ---- */
+  details.trend-table { margin-top: 4px; }
+  details.trend-table summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  #trend-matrix-wrap { overflow-x: auto; margin-top: 8px; }
+  #trend-matrix td.has-new { color: var(--critical); font-weight: 600; }
+  #trend-matrix td.zero { color: var(--muted); }
+  #trend-matrix .cfg-col { white-space: nowrap; }
+
+  /* ---- 날짜별 상세 ---- */
   .detail-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .detail-head select {
     font: inherit; padding: 3px 8px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--surface); color: var(--ink);
   }
-  .cfg-block { margin-top: 14px; }
-  .cfg-block h3 { font-size: 13.5px; margin: 0 0 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .cfg-block h3 .key { width: 14px; height: 0; border-top: 2.5px solid; border-radius: 2px; display: inline-block; }
-  .cfg-block h3 .sum { color: var(--ink-2); font-weight: 400; font-size: 12.5px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 10px; border-top: 1px solid var(--grid); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: none; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td .mono, .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+  details.cfg-block { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; }
+  details.cfg-block summary {
+    cursor: pointer; list-style-position: outside;
+    font-size: 13.5px; font-weight: 600;
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  details.cfg-block summary::-webkit-details-marker { display: none; }
+  details.cfg-block summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
+  details.cfg-block[open] summary::before { content: "▾"; }
+  details.cfg-block summary .sum { color: var(--ink-2); font-weight: 400; font-size: 12.5px; }
+  details.cfg-block summary .new-chip {
+    color: var(--critical); font-weight: 600; font-size: 12px; white-space: nowrap;
+  }
+  details.cfg-block table { margin-top: 8px; }
+  td { vertical-align: top; }
   .excerpt { color: var(--ink-2); }
   .badge-new {
     display: inline-flex; align-items: center; gap: 5px;
@@ -140,11 +164,10 @@
   .st-ongoing { color: var(--ink-2); font-size: 12px; white-space: nowrap; }
   .since { color: var(--muted); font-size: 11.5px; }
   .conf { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
-  .all-green { color: var(--good-text); font-size: 13px; padding: 8px 0 2px; }
-  a { color: var(--series-a); }
+  .all-green-line { color: var(--good-text); font-size: 13px; margin-top: 12px;
+                    border-top: 1px solid var(--grid); padding-top: 10px; }
+  a { color: var(--accent); }
 
-  details.trend-table { margin-top: 4px; }
-  details.trend-table summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
   #error-box { display: none; border: 1px solid var(--critical); color: var(--critical);
                border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; }
 </style>
@@ -164,16 +187,23 @@
   <section class="stats" id="stats"></section>
 
   <section class="card">
-    <h2>구성별 fail 추이</h2>
-    <p class="caption">일자별 fail TC 수 · 차트를 클릭하면 해당 날짜 상세로 이동</p>
-    <div class="legend" id="legend"></div>
+    <h2>구성 현황</h2>
+    <p class="caption">신규 fail·증감 많은 순 정렬 · 행을 클릭하면 아래 추이 차트가 해당 구성으로 전환</p>
+    <div style="overflow-x:auto">
+      <table id="config-table"></table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 id="chart-title">fail 추이 — 전체 합계</h2>
+    <p class="caption">일자별 fail TC 수 · <span style="color:var(--critical)">●</span> 신규 fail 발생일 · 차트를 클릭하면 해당 날짜 상세로 이동</p>
     <div id="chart-wrap">
-      <svg id="chart" role="img" aria-label="구성별 일자별 fail 수 추이 선 그래프"></svg>
+      <svg id="chart" role="img" aria-label="일자별 fail 수 추이 선 그래프"></svg>
       <div id="tooltip"></div>
     </div>
     <details class="trend-table">
-      <summary>추이 데이터 표로 보기</summary>
-      <div id="trend-table"></div>
+      <summary>전체 구성 × 날짜 매트릭스로 보기</summary>
+      <div id="trend-matrix-wrap"><table id="trend-matrix"></table></div>
     </details>
   </section>
 
@@ -188,13 +218,14 @@
 
 <script>
 "use strict";
-// 데이터 위치: repo 루트 기준 results/. GitHub Pages(root 서빙) 또는
+// 데이터 위치: repo 루트 기준 results/. GitHub Pages(main 브랜치 + root 서빙) 또는
 // `python3 -m http.server` (repo 루트에서 실행) 기준으로 동작한다.
 const DATA_BASE = new URL("../results/", location.href);
-const SERIES_VARS = ["--series-a", "--series-b", "--series-c"];
 const CONF_LABEL = { high: "높음", medium: "추정", unknown: "불명" };
+const AGG = null;  // selectedConfig가 이 값이면 전체 합계
 
-const state = { configs: [], index: {}, dates: [], daily: {}, selected: null };
+const state = { configs: [], index: {}, dates: [], daily: {},
+                selectedDate: null, selectedConfig: AGG };
 
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -204,13 +235,18 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;  // 라벨은 신뢰하지 않는 데이터 — textContent만 사용
   return n;
 };
+const svgEl = (tag, attrs) => {
+  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+};
 
 // ---- 테마 토글: data-theme 스탬프가 OS 설정을 양방향으로 이긴다 ----
 $("theme-toggle").addEventListener("click", () => {
   const root = document.documentElement;
   const dark = getComputedStyle(root).colorScheme.includes("dark");
   root.dataset.theme = dark ? "light" : "dark";
-  render();  // 시리즈 색은 CSS 변수에서 읽으므로 다시 그린다
+  render();  // 색을 CSS 변수에서 읽으므로 다시 그린다
 });
 
 async function fetchJson(url) {
@@ -222,11 +258,11 @@ async function fetchJson(url) {
 async function load() {
   const manifest = await fetchJson(new URL("configs.json", DATA_BASE));
   state.configs = manifest.configs;
-  for (const cfg of state.configs) {
+  await Promise.all(state.configs.map(async (cfg) => {
     state.index[cfg.id] = await fetchJson(new URL(`${cfg.id}/index.json`, DATA_BASE));
-  }
+  }));
   state.dates = state.index[state.configs[0].id].days.map((d) => d.date);
-  state.selected = state.dates[state.dates.length - 1];
+  state.selectedDate = state.dates[state.dates.length - 1];
 }
 
 async function dailyOf(cfgId, date) {
@@ -239,6 +275,21 @@ async function dailyOf(cfgId, date) {
 
 const dayRow = (cfgId, date) => state.index[cfgId].days.find((d) => d.date === date);
 const mmdd = (date) => date.slice(5).replace("-", "/");
+
+// 차트에 그릴 시계열: 구성 하나 또는 전체 합계
+function seriesOf(cfgId) {
+  if (cfgId !== AGG) {
+    return state.index[cfgId].days.map((d) => ({ date: d.date, fail: d.fail, new_fail: d.new_fail }));
+  }
+  return state.dates.map((date) => {
+    let fail = 0, nf = 0;
+    for (const c of state.configs) {
+      const r = dayRow(c.id, date);
+      fail += r.fail; nf += r.new_fail;
+    }
+    return { date, fail, new_fail: nf };
+  });
+}
 
 // ---------------------------------------------------------------- 스탯 타일
 function renderStats() {
@@ -267,32 +318,124 @@ function renderStats() {
   tile("fail 없는 구성", `${green} / ${state.configs.length}`, el("div", "delta", "오늘 기준"));
 }
 
-// ---------------------------------------------------------------- 차트
-const CH = { w: 1040, h: 320, top: 18, right: 130, bottom: 34, left: 44 };
+// ---------------------------------------------------------------- 구성 현황
+function sparkline(cfgId) {
+  const days = state.index[cfgId].days;
+  const W = 120, H = 28, PAD = 3;
+  const max = Math.max(1, ...days.map((d) => d.fail));
+  const x = (i) => PAD + (i * (W - 2 * PAD)) / (days.length - 1);
+  const y = (v) => H - PAD - (v / max) * (H - 2 * PAD);
 
-function scales() {
-  const maxFail = Math.max(...state.configs.flatMap((c) => state.index[c.id].days.map((d) => d.fail)));
-  const yMax = Math.max(10, Math.ceil(maxFail / 10) * 10);
-  const x = (i) => CH.left + (i * (CH.w - CH.left - CH.right)) / (state.dates.length - 1);
-  const y = (v) => CH.top + (1 - v / yMax) * (CH.h - CH.top - CH.bottom);
-  return { x, y, yMax };
+  const svg = svgEl("svg", { width: W, height: H, class: "spark",
+    viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${cfgId} 최근 ${days.length}일 fail 추이` });
+  svg.appendChild(svgEl("line", { x1: PAD, x2: W - PAD, y1: y(0), y2: y(0),
+    stroke: css("--grid"), "stroke-width": 1 }));
+  svg.appendChild(svgEl("path", {
+    d: days.map((d, i) => `${i ? "L" : "M"}${x(i)},${y(d.fail)}`).join(""),
+    fill: "none", stroke: css("--accent"), "stroke-width": 1.5,
+    "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  const li = days.length - 1;
+  svg.appendChild(svgEl("circle", { cx: x(li), cy: y(days[li].fail), r: 2.5,
+    fill: css("--accent"), stroke: css("--surface"), "stroke-width": 1.5 }));
+  return svg;
 }
 
-function svgEl(tag, attrs) {
-  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-  return n;
+function renderConfigTable() {
+  const last = state.dates[state.dates.length - 1];
+  const prev = state.dates[state.dates.length - 2];
+  const table = $("config-table");
+  table.replaceChildren();
+
+  const thead = el("thead");
+  const hr = el("tr");
+  for (const [t, cls] of [["구성", null], ["TC", "num"], ["fail", "num"],
+                          ["Δ 전일", "num"], ["신규", "num"], ["최근 10일", null]]) {
+    hr.appendChild(el("th", cls, t));
+  }
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const rows = state.configs.map((cfg) => {
+    const now = dayRow(cfg.id, last), before = dayRow(cfg.id, prev);
+    return { cfg, now, delta: now.fail - before.fail };
+  }).sort((a, b) => b.now.new_fail - a.now.new_fail
+                 || b.delta - a.delta
+                 || b.now.fail - a.now.fail
+                 || a.cfg.id.localeCompare(b.cfg.id));
+
+  const tbody = el("tbody");
+  for (const { cfg, now, delta } of rows) {
+    const tr = el("tr");
+    tr.dataset.cfg = cfg.id;
+    if (state.selectedConfig === cfg.id) tr.classList.add("selected");
+
+    const tdName = el("td");
+    tdName.appendChild(el("span", "mono", cfg.id));
+    tdName.appendChild(el("span", "cfg-label", `  ${cfg.label}`));
+    tr.appendChild(tdName);
+
+    tr.appendChild(el("td", "num", String(cfg.total)));
+
+    const tdFail = el("td", "num" + (now.fail === 0 ? " zero" : ""));
+    if (now.fail === 0) {
+      tdFail.appendChild(el("span", "green-dot", "✓ 0"));
+    } else {
+      tdFail.textContent = String(now.fail);
+    }
+    tr.appendChild(tdFail);
+
+    const cls = delta > 0 ? "delta-up" : delta < 0 ? "delta-down" : "delta-flat";
+    tr.appendChild(el("td", `num ${cls}`,
+      delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "—"));
+
+    tr.appendChild(el("td", "num" + (now.new_fail ? " new-cell" : " zero"),
+      now.new_fail ? String(now.new_fail) : "·"));
+
+    const tdSpark = el("td");
+    tdSpark.appendChild(sparkline(cfg.id));
+    tr.appendChild(tdSpark);
+
+    tr.addEventListener("click", () => {
+      state.selectedConfig = state.selectedConfig === cfg.id ? AGG : cfg.id;
+      renderConfigTable();
+      renderChart();
+    });
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+}
+
+// ---------------------------------------------------------------- 추이 차트
+const CH = { w: 1040, h: 300, top: 18, right: 96, bottom: 34, left: 44 };
+
+function niceStep(maxV) {
+  const raw = maxV / 4;
+  for (const s of [1, 2, 5, 10, 20, 25, 50, 100]) if (s >= raw) return s;
+  return 200;
 }
 
 function renderChart() {
+  const cfgId = state.selectedConfig;
+  const series = seriesOf(cfgId);
+  const label = cfgId === AGG ? "전체 합계"
+    : `${cfgId} · ${state.configs.find((c) => c.id === cfgId).label}`;
+  $("chart-title").textContent = `fail 추이 — ${label}`;
+
   const svg = $("chart");
   svg.replaceChildren();
   svg.setAttribute("viewBox", `0 0 ${CH.w} ${CH.h}`);
-  const { x, y, yMax } = scales();
+
+  const maxFail = Math.max(1, ...series.map((d) => d.fail));
+  const step = niceStep(maxFail);
+  const yMax = Math.max(step, Math.ceil(maxFail / step) * step);
+  const x = (i) => CH.left + (i * (CH.w - CH.left - CH.right)) / (series.length - 1);
+  const y = (v) => CH.top + (1 - v / yMax) * (CH.h - CH.top - CH.bottom);
   const surface = css("--surface");
+  const accent = css("--accent");
 
   // 가로 그리드(hairline solid) + y 눈금
-  for (let v = 0; v <= yMax; v += 10) {
+  for (let v = 0; v <= yMax; v += step) {
     svg.appendChild(svgEl("line", { x1: CH.left, x2: CH.w - CH.right, y1: y(v), y2: y(v),
       stroke: v === 0 ? css("--baseline") : css("--grid"), "stroke-width": 1 }));
     svg.appendChild(Object.assign(svgEl("text", { x: CH.left - 8, y: y(v) + 4,
@@ -300,17 +443,17 @@ function renderChart() {
       style: "font-variant-numeric: tabular-nums" }), { textContent: v }));
   }
   // x 눈금 (일자)
-  state.dates.forEach((d, i) => {
+  series.forEach((d, i) => {
     svg.appendChild(Object.assign(svgEl("text", { x: x(i), y: CH.h - 10,
       "text-anchor": "middle", "font-size": 11, fill: css("--muted"),
-      style: "font-variant-numeric: tabular-nums" }), { textContent: mmdd(d) }));
+      style: "font-variant-numeric: tabular-nums" }), { textContent: mmdd(d.date) }));
   });
 
   // 선택된 날짜 표시
-  const selIdx = state.dates.indexOf(state.selected);
+  const selIdx = state.dates.indexOf(state.selectedDate);
   if (selIdx >= 0) {
     svg.appendChild(svgEl("line", { x1: x(selIdx), x2: x(selIdx), y1: CH.top, y2: y(0),
-      stroke: css("--baseline"), "stroke-width": 1, "stroke-dasharray": "none", opacity: 0.9 }));
+      stroke: css("--baseline"), "stroke-width": 1, opacity: 0.9 }));
   }
 
   // 크로스헤어 (hover 시 표시)
@@ -318,22 +461,27 @@ function renderChart() {
     stroke: css("--muted"), "stroke-width": 1, visibility: "hidden" });
   svg.appendChild(crosshair);
 
-  // 시리즈: 2px 라인 + 끝점 8px 마커(2px surface 링) + 직접 라벨
-  state.configs.forEach((cfg, ci) => {
-    const color = css(SERIES_VARS[ci]);
-    const days = state.index[cfg.id].days;
-    const dPath = days.map((d, i) => `${i ? "L" : "M"}${x(i)},${y(d.fail)}`).join("");
-    svg.appendChild(svgEl("path", { d: dPath, fill: "none", stroke: color,
-      "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
-    const li = days.length - 1;
-    svg.appendChild(svgEl("circle", { cx: x(li), cy: y(days[li].fail), r: 4,
-      fill: color, stroke: surface, "stroke-width": 2 }));
-    const label = Object.assign(svgEl("text", { x: x(li) + 10, y: y(days[li].fail) + 4,
-      "font-size": 12, fill: css("--ink-2") }), { textContent: `${cfg.id} ${days[li].fail}` });
-    svg.appendChild(label);
+  // 단일 시리즈: 2px 라인 + 신규 fail 발생일 마커 + 끝점 마커 + 직접 라벨
+  svg.appendChild(svgEl("path", {
+    d: series.map((d, i) => `${i ? "L" : "M"}${x(i)},${y(d.fail)}`).join(""),
+    fill: "none", stroke: accent, "stroke-width": 2,
+    "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  series.forEach((d, i) => {
+    if (d.new_fail > 0) {
+      svg.appendChild(svgEl("circle", { cx: x(i), cy: y(d.fail), r: 4,
+        fill: css("--critical"), stroke: surface, "stroke-width": 2 }));
+    }
   });
+  const li = series.length - 1;
+  if (series[li].new_fail === 0) {
+    svg.appendChild(svgEl("circle", { cx: x(li), cy: y(series[li].fail), r: 4,
+      fill: accent, stroke: surface, "stroke-width": 2 }));
+  }
+  svg.appendChild(Object.assign(svgEl("text", { x: x(li) + 10, y: y(series[li].fail) + 4,
+    "font-size": 12, fill: css("--ink-2"),
+    style: "font-variant-numeric: tabular-nums" }), { textContent: String(series[li].fail) }));
 
-  // hover 레이어: 크로스헤어가 X를 찾고, 툴팁은 전 시리즈를 보여준다
+  // hover 레이어: 크로스헤어가 X를 찾는다
   const overlay = svgEl("rect", { x: CH.left, y: CH.top,
     width: CH.w - CH.left - CH.right, height: CH.h - CH.top - CH.bottom,
     fill: "transparent", cursor: "pointer" });
@@ -344,9 +492,9 @@ function renderChart() {
     const rect = svg.getBoundingClientRect();
     const px = ((ev.clientX - rect.left) / rect.width) * CH.w;
     let best = 0, bestDist = Infinity;
-    state.dates.forEach((_, i) => {
-      const d = Math.abs(x(i) - px);
-      if (d < bestDist) { bestDist = d; best = i; }
+    series.forEach((_, i) => {
+      const dd = Math.abs(x(i) - px);
+      if (dd < bestDist) { bestDist = dd; best = i; }
     });
     return best;
   };
@@ -357,18 +505,15 @@ function renderChart() {
     crosshair.setAttribute("x2", x(i));
     crosshair.setAttribute("visibility", "visible");
 
-    tooltip.replaceChildren(el("div", "tt-date", state.dates[i]));
-    const rows = state.configs.map((cfg, ci) => ({ cfg, ci, row: dayRow(cfg.id, state.dates[i]) }))
-      .sort((a, b) => b.row.fail - a.row.fail);
-    for (const { cfg, ci, row } of rows) {
-      const r = el("div", "tt-row");
-      const key = el("span", "tt-key");
-      key.style.borderTopColor = css(SERIES_VARS[ci]);
-      r.appendChild(key);
-      r.appendChild(el("span", "tt-val", String(row.fail)));
-      r.appendChild(el("span", "tt-name", cfg.id));
-      if (row.new_fail > 0) r.appendChild(el("span", "tt-new", `신규 ${row.new_fail}`));
-      tooltip.appendChild(r);
+    tooltip.replaceChildren(el("div", "tt-date", series[i].date));
+    const r1 = el("div", "tt-row");
+    r1.appendChild(el("span", "tt-val", String(series[i].fail)));
+    r1.appendChild(el("span", "tt-name", "fail"));
+    tooltip.appendChild(r1);
+    if (series[i].new_fail > 0) {
+      const r2 = el("div", "tt-row");
+      r2.appendChild(el("span", "tt-new", `신규 ${series[i].new_fail}`));
+      tooltip.appendChild(r2);
     }
     const wrapRect = $("chart-wrap").getBoundingClientRect();
     const rect = svg.getBoundingClientRect();
@@ -376,7 +521,7 @@ function renderChart() {
     tooltip.style.display = "block";
     const flip = pxOnScreen > wrapRect.width * 0.72;
     tooltip.style.left = flip ? `${pxOnScreen - tooltip.offsetWidth - 14}px` : `${pxOnScreen + 14}px`;
-    tooltip.style.top = "24px";
+    tooltip.style.top = "20px";
   });
   overlay.addEventListener("pointerleave", () => {
     crosshair.setAttribute("visibility", "hidden");
@@ -387,46 +532,33 @@ function renderChart() {
   });
 }
 
-function renderLegend() {
-  const legend = $("legend");
-  legend.replaceChildren();
-  state.configs.forEach((cfg, ci) => {
-    const item = el("span", "item");
-    const key = el("span", "key");
-    key.style.borderTopColor = css(SERIES_VARS[ci]);
-    item.appendChild(key);
-    item.appendChild(el("span", null, `${cfg.id} · ${cfg.label} (TC ${cfg.total})`));
-    legend.appendChild(item);
-  });
-}
+// 전체 구성 × 날짜 매트릭스 (차트의 테이블 뷰 — 접근성/relief 채널)
+function renderTrendMatrix() {
+  const table = $("trend-matrix");
+  table.replaceChildren();
 
-// 추이 데이터 표 (차트의 테이블 뷰 — 접근성/relief 채널)
-function renderTrendTable() {
-  const wrap = $("trend-table");
-  wrap.replaceChildren();
-  const table = el("table");
   const thead = el("thead");
   const hr = el("tr");
-  hr.appendChild(el("th", null, "날짜"));
-  state.configs.forEach((cfg) => {
-    hr.appendChild(el("th", "num", `${cfg.id} fail`));
-    hr.appendChild(el("th", "num", "신규"));
-  });
+  hr.appendChild(el("th", "cfg-col", "구성"));
+  state.dates.forEach((d) => hr.appendChild(el("th", "num", mmdd(d))));
   thead.appendChild(hr);
   table.appendChild(thead);
+
   const tbody = el("tbody");
-  state.dates.forEach((date) => {
+  for (const cfg of state.configs) {
     const tr = el("tr");
-    tr.appendChild(el("td", null, date));
-    state.configs.forEach((cfg) => {
-      const row = dayRow(cfg.id, date);
-      tr.appendChild(el("td", "num", String(row.fail)));
-      tr.appendChild(el("td", "num", row.new_fail ? String(row.new_fail) : "·"));
-    });
+    const tdName = el("td", "cfg-col mono", cfg.id);
+    tr.appendChild(tdName);
+    for (const date of state.dates) {
+      const r = dayRow(cfg.id, date);
+      const td = el("td", "num" + (r.new_fail > 0 ? " has-new" : r.fail === 0 ? " zero" : ""),
+        r.fail === 0 ? "·" : String(r.fail));
+      if (r.new_fail > 0) td.title = `신규 ${r.new_fail}`;
+      tr.appendChild(td);
+    }
     tbody.appendChild(tr);
-  });
+  }
   table.appendChild(tbody);
-  wrap.appendChild(table);
 }
 
 // ---------------------------------------------------------------- 날짜별 상세
@@ -434,25 +566,30 @@ async function renderDetail() {
   const detail = $("detail");
   detail.replaceChildren();
 
-  for (const [ci, cfg] of state.configs.entries()) {
-    const day = await dailyOf(cfg.id, state.selected);
-    const block = el("div", "cfg-block");
-    const h = el("h3");
-    const key = el("span", "key");
-    key.style.borderTopColor = css(SERIES_VARS[ci]);
-    h.appendChild(key);
-    h.appendChild(el("span", null, `${cfg.id} · ${cfg.label}`));
-    const s = day.summary;
-    h.appendChild(el("span", "sum",
-      `total ${s.total} · pass ${s.pass} · fail ${s.fail} · 신규 ${s.new_fail}`));
-    block.appendChild(h);
+  const days = await Promise.all(
+    state.configs.map((cfg) => dailyOf(cfg.id, state.selectedDate)));
+  const withFail = [];
+  const green = [];
+  state.configs.forEach((cfg, i) => {
+    (days[i].summary.fail > 0 ? withFail : green).push({ cfg, day: days[i] });
+  });
+  // 신규 fail 있는 구성 먼저
+  withFail.sort((a, b) => b.day.summary.new_fail - a.day.summary.new_fail
+                       || b.day.summary.fail - a.day.summary.fail
+                       || a.cfg.id.localeCompare(b.cfg.id));
 
-    const tcs = Object.keys(day.failures).sort();
-    if (tcs.length === 0) {
-      block.appendChild(el("div", "all-green", "✓ 전 TC pass"));
-      detail.appendChild(block);
-      continue;
-    }
+  for (const { cfg, day } of withFail) {
+    const s = day.summary;
+    const block = el("details", "cfg-block");
+    if (s.new_fail > 0) block.open = true;  // 신규 있는 구성만 펼침
+
+    const summary = el("summary");
+    summary.appendChild(el("span", "mono", cfg.id));
+    summary.appendChild(el("span", null, cfg.label));
+    summary.appendChild(el("span", "sum",
+      `total ${s.total} · pass ${s.pass} · fail ${s.fail}`));
+    if (s.new_fail > 0) summary.appendChild(el("span", "new-chip", `▲ 신규 ${s.new_fail}`));
+    block.appendChild(summary);
 
     const table = el("table");
     const thead = el("thead");
@@ -464,8 +601,7 @@ async function renderDetail() {
     table.appendChild(thead);
     const tbody = el("tbody");
 
-    // 신규 fail을 위로
-    tcs.sort((a, b) => {
+    const tcs = Object.keys(day.failures).sort((a, b) => {
       const sa = day.failures[a].status === "new" ? 0 : 1;
       const sb = day.failures[b].status === "new" ? 0 : 1;
       return sa - sb || a.localeCompare(b);
@@ -511,6 +647,11 @@ async function renderDetail() {
     block.appendChild(table);
     detail.appendChild(block);
   }
+
+  if (green.length > 0) {
+    detail.appendChild(el("div", "all-green-line",
+      `✓ 전 TC pass: ${green.map(({ cfg }) => cfg.id).join(", ")}`));
+  }
 }
 
 function renderDateSelect() {
@@ -521,12 +662,12 @@ function renderDateSelect() {
     o.value = date;
     sel.appendChild(o);
   }
-  sel.value = state.selected;
+  sel.value = state.selectedDate;
   sel.onchange = () => selectDate(sel.value);
 }
 
 function selectDate(date) {
-  state.selected = date;
+  state.selectedDate = date;
   $("date-select").value = date;
   renderChart();  // 선택 표시선 갱신
   renderDetail();
@@ -534,9 +675,9 @@ function selectDate(date) {
 
 function render() {
   renderStats();
-  renderLegend();
+  renderConfigTable();
   renderChart();
-  renderTrendTable();
+  renderTrendMatrix();
   renderDateSelect();
   renderDetail();
 }

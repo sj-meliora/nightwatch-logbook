@@ -6,7 +6,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "single seq write/read verify miscompare at lba=0x100",
-      "log_url": "https://dobee.example.internal/run/3177/tc/TC_IO_BASIC_005",
+      "log_url": "https://dobee.example.internal/run/4477/tc/TC_IO_BASIC_005",
       "since": "2026-07-21",
       "status": "new",
       "suspect_sha": null

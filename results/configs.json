@@ -14,6 +14,46 @@
       "id": "cfg-c",
       "label": "smoke suite",
       "total": 150
+    },
+    {
+      "id": "cfg-d",
+      "label": "FTL GC stress",
+      "total": 300
+    },
+    {
+      "id": "cfg-e",
+      "label": "power loss recovery",
+      "total": 250
+    },
+    {
+      "id": "cfg-f",
+      "label": "IO performance",
+      "total": 500
+    },
+    {
+      "id": "cfg-g",
+      "label": "metadata journal",
+      "total": 350
+    },
+    {
+      "id": "cfg-h",
+      "label": "security & sanitize",
+      "total": 180
+    },
+    {
+      "id": "cfg-i",
+      "label": "compat matrix",
+      "total": 600
+    },
+    {
+      "id": "cfg-j",
+      "label": "wear leveling soak",
+      "total": 220
+    },
+    {
+      "id": "cfg-k",
+      "label": "thermal & throttle",
+      "total": 280
     }
   ],
   "schema_version": 1

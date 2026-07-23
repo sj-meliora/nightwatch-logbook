@@ -6,7 +6,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "trace buffer overrun drops 1.2% events under load",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_DBG_TRACE_090",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_DBG_TRACE_090",
       "since": "2026-07-12",
       "status": "ongoing",
       "suspect_sha": null
@@ -15,7 +15,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "ASSERT at gc_policy.c:88: victim_score < 0",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_GC_003",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_GC_003",
       "since": "2026-06-30",
       "status": "ongoing",
       "suspect_sha": null
@@ -24,7 +24,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "ASSERT at gc_policy.c:132: free_blk < reserve_min",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_GC_009",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_GC_009",
       "since": "2026-07-04",
       "status": "ongoing",
       "suspect_sha": null
@@ -33,7 +33,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "map entry crc mismatch, lpn=0x8821a",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_MAP_133",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_MAP_133",
       "since": "2026-07-09",
       "status": "ongoing",
       "suspect_sha": null
@@ -42,7 +42,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "trimmed range readback non-zero at lba=0x1f000",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_TRIM_060",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_TRIM_060",
       "since": "2026-07-07",
       "status": "ongoing",
       "suspect_sha": null
@@ -51,7 +51,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "deallocate during gc migrates trimmed block, data resurrect",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_TRIM_072",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_TRIM_072",
       "since": "2026-07-19",
       "status": "ongoing",
       "suspect_sha": null
@@ -60,7 +60,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "TIMEOUT after 1800s in wear_level_stress",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_WEAR_101",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_WEAR_101",
       "since": "2026-07-02",
       "status": "ongoing",
       "suspect_sha": null
@@ -69,7 +69,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "wear delta 412 > threshold 256 after 10k cycles",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_FTL_WEAR_115",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_FTL_WEAR_115",
       "since": "2026-06-27",
       "status": "ongoing",
       "suspect_sha": null
@@ -78,7 +78,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "p99 latency 812ms > budget 300ms under mixed load",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_LAT_083",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_LAT_083",
       "since": "2026-07-03",
       "status": "ongoing",
       "suspect_sha": null
@@ -87,7 +87,7 @@
       "author": "kang.jj",
       "confidence": "medium",
       "log_excerpt": "MISCOMPARE under 70/30 mixed after 2h, lba=0x29ff10",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_MIXED_090",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_MIXED_090",
       "since": "2026-07-20",
       "status": "ongoing",
       "suspect_sha": "b8d4310"
@@ -96,7 +96,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "IOPS 8.2k < floor 12k at qd1 rand read",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_QD1_101",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_QD1_101",
       "since": "2026-06-25",
       "status": "ongoing",
       "suspect_sha": null
@@ -105,7 +105,7 @@
       "author": "seo.mm",
       "confidence": "unknown",
       "log_excerpt": "hang: qd32 rand write stalls at 97% completion",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_QD32_055",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_QD32_055",
       "since": "2026-07-16",
       "status": "ongoing",
       "suspect_sha": "4c77f02"
@@ -114,7 +114,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "MISCOMPARE lba=0x3f2a10 expected=0xAA got=0x00",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_RAND_034",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_RAND_034",
       "since": "2026-07-05",
       "status": "ongoing",
       "suspect_sha": null
@@ -123,7 +123,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "MISCOMPARE lba=0x11b204 expected=0x5A got=0xFF",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_IO_RAND_047",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_IO_RAND_047",
       "since": "2026-07-11",
       "status": "ongoing",
       "suspect_sha": null
@@ -132,7 +132,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "format with meta_v3 leaves stale sb copy",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_META_FMT_027",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_META_FMT_027",
       "since": "2026-07-10",
       "status": "ongoing",
       "suspect_sha": null
@@ -141,7 +141,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "journal replay stopped at seq=99182, tail corrupt",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_META_JOURNAL_002",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_META_JOURNAL_002",
       "since": "2026-07-06",
       "status": "ongoing",
       "suspect_sha": null
@@ -150,7 +150,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "journal checkpoint skipped when gc pressure high",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_META_JOURNAL_019",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_META_JOURNAL_019",
       "since": "2026-07-18",
       "status": "ongoing",
       "suspect_sha": null
@@ -159,7 +159,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "PANIC: snapshot replay mismatch, gen=42",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_META_SNAP_007",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_META_SNAP_007",
       "since": "2026-06-21",
       "status": "ongoing",
       "suspect_sha": null
@@ -168,7 +168,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "AER completion missing after ns attach event",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_NVME_AER_071",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_NVME_AER_071",
       "since": "2026-07-09",
       "status": "ongoing",
       "suspect_sha": null
@@ -177,7 +177,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "format nvm timeout, csts.rdy stuck 1",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_NVME_FMT_083",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_NVME_FMT_083",
       "since": "2026-07-11",
       "status": "ongoing",
       "suspect_sha": null
@@ -186,7 +186,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "recovery loop exceeded 3 retries after power cut",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_PWR_LOSS_112",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_PWR_LOSS_112",
       "since": "2026-07-08",
       "status": "ongoing",
       "suspect_sha": null
@@ -195,7 +195,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "unflushed window 48ms > spec 20ms on plp path",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_PWR_LOSS_127",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_PWR_LOSS_127",
       "since": "2026-07-12",
       "status": "ongoing",
       "suspect_sha": null
@@ -204,7 +204,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "crypto erase leaves readable region at lba=0x0",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_SEC_ERASE_014",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_SEC_ERASE_014",
       "since": "2026-07-03",
       "status": "ongoing",
       "suspect_sha": null
@@ -213,7 +213,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "TIMEOUT after 3600s in mixed stress iteration 88",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_STRESS_LOOP_031",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_STRESS_LOOP_031",
       "since": "2026-06-29",
       "status": "ongoing",
       "suspect_sha": null
@@ -222,7 +222,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "TIMEOUT after 3600s in mixed stress iteration 141",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_STRESS_LOOP_042",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_STRESS_LOOP_042",
       "since": "2026-07-01",
       "status": "ongoing",
       "suspect_sha": null
@@ -231,7 +231,7 @@
       "author": null,
       "confidence": null,
       "log_excerpt": "throttle oscillation, temp 87C > limit 85C",
-      "log_url": "https://dobee.example.internal/run/8777/tc/TC_STRESS_THERM_055",
+      "log_url": "https://dobee.example.internal/run/3077/tc/TC_STRESS_THERM_055",
       "since": "2026-07-05",
       "status": "ongoing",
       "suspect_sha": null

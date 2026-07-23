@@ -1,0 +1,49 @@
+{
+  "config": "cfg-d",
+  "date": "2026-07-23",
+  "failures": {
+    "TC_GCS_HOT_COLD_012": {
+      "author": null,
+      "confidence": null,
+      "log_excerpt": "gc write amp 4.8 > limit 3.5 under hot/cold mix",
+      "log_url": "https://dobee.example.internal/run/5199/tc/TC_GCS_HOT_COLD_012",
+      "since": "2026-07-03",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_GCS_RESERVE_031": {
+      "author": null,
+      "confidence": null,
+      "log_excerpt": "reserve blocks below min watermark after loop 77",
+      "log_url": "https://dobee.example.internal/run/5199/tc/TC_GCS_RESERVE_031",
+      "since": "2026-07-10",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_GCS_URGENT_027": {
+      "author": null,
+      "confidence": null,
+      "log_excerpt": "urgent gc misses deadline, host write stall 1.2s",
+      "log_url": "https://dobee.example.internal/run/5199/tc/TC_GCS_URGENT_027",
+      "since": "2026-06-26",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_GCS_VICTIM_044": {
+      "author": "kim.xx",
+      "confidence": "medium",
+      "log_excerpt": "victim pick loops on same block, gc starvation",
+      "log_url": "https://dobee.example.internal/run/5199/tc/TC_GCS_VICTIM_044",
+      "since": "2026-07-23",
+      "status": "new",
+      "suspect_sha": "a3f9c21"
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "fail": 4,
+    "new_fail": 1,
+    "pass": 296,
+    "total": 300
+  }
+}

@@ -68,6 +68,8 @@ GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가
 python3 scripts/generate_sample_data.py
 ```
 
-구성 시나리오: `cfg-a`(FTL full regression, TC 900 — 만성 fail 22건 + 에피소드,
-7/23에 신규 3건), `cfg-b`(NVMe protocol suite, TC 420), `cfg-c`(smoke suite,
-TC 150 — 대부분 all green).
+구성은 11개(`cfg-a` ~ `cfg-k`, TC 150~900)로, 만성 fail 위에 신규/해소
+에피소드가 오가는 시나리오입니다. `cfg-a`(FTL full regression, TC 900)의
+7/23은 설계 문서 예시(900/872/28/신규 3)와 일치하고, `cfg-a`와 `cfg-d`에
+같은 변경점(`a3f9c21`)이 의심되는 교차 구성 신호도 포함되어 있습니다.
+`cfg-c`/`cfg-h`는 대부분 all green입니다.

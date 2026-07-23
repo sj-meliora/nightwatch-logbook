@@ -1,0 +1,22 @@
+{
+  "config": "cfg-g",
+  "date": "2026-07-15",
+  "failures": {
+    "TC_MJ_REPLAY_014": {
+      "author": null,
+      "confidence": null,
+      "log_excerpt": "replay time 8.4s > budget 5s on full journal",
+      "log_url": "https://dobee.example.internal/run/7211/tc/TC_MJ_REPLAY_014",
+      "since": "2026-07-05",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "fail": 1,
+    "new_fail": 0,
+    "pass": 349,
+    "total": 350
+  }
+}

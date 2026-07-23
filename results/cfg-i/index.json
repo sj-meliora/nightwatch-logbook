@@ -1,0 +1,78 @@
+{
+  "config": "cfg-i",
+  "days": [
+    {
+      "date": "2026-07-14",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-15",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-16",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-17",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-18",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-19",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-20",
+      "fail": 6,
+      "new_fail": 0,
+      "pass": 594,
+      "total": 600
+    },
+    {
+      "date": "2026-07-21",
+      "fail": 5,
+      "new_fail": 0,
+      "pass": 595,
+      "total": 600
+    },
+    {
+      "date": "2026-07-22",
+      "fail": 5,
+      "new_fail": 0,
+      "pass": 595,
+      "total": 600
+    },
+    {
+      "date": "2026-07-23",
+      "fail": 5,
+      "new_fail": 0,
+      "pass": 595,
+      "total": 600
+    }
+  ],
+  "label": "compat matrix",
+  "schema_version": 1,
+  "updated": "2026-07-23"
+}
