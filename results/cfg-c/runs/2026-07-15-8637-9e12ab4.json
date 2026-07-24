@@ -1,0 +1,14 @@
+{
+  "config": "cfg-c",
+  "date": "2026-07-15",
+  "failures": {},
+  "pegging_sha": "9e12ab4",
+  "run_id": 8637,
+  "schema_version": 2,
+  "summary": {
+    "fail": 0,
+    "new_fail": 0,
+    "pass": 150,
+    "total": 150
+  }
+}

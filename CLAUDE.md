@@ -7,12 +7,17 @@ GitHub Pages 정적 대시보드를 제공한다. 현재는 예시 데이터 기
 ## 작동 방식
 
 ```
-dobee 결과 → results/{config}/{date}.json   (원본, 구성×일자당 1개, 불변)
-           → results/{config}/index.json    (파생 rollup, 매일 재생성)
-           → reviews/daily/{date}.md        (일간 보고 — 당번 검수용)
-           → reviews/monthly/{YYYY-MM}.md   (월간 리뷰 — 회고/성과 보고용)
+dobee run 결과 → results/{config}/runs/{date}-{run_id}-{sha7}.json
+                                            (원본, 구성×run당 1개, 불변)
+              → results/{config}/index.json (파생 rollup — 날짜별 대표+run 체인)
+              → reviews/daily/{date}.md     (일간 보고 — 당번 검수용)
+              → reviews/monthly/{YYYY-MM}.md (월간 리뷰 — 회고/성과 보고용)
 docs/index.html ← 위 파일들을 fetch해 렌더링하는 단일 파일 대시보드
 ```
+
+run은 integration pegging sha(FTL sha와 1:1) 단위이고 전 구성 공통이다.
+신규 fail 판정은 run 시퀀스 diff이며, 후보 변경점 구간
+`(직전 pegging..since_sha]`가 데이터에서 재구성된다.
 
 - 운영 시 daily agent가 매일 위 파일들을 커밋하며, 커밋 = 배포다
   (Pages가 main 브랜치 root를 서빙, 대시보드 진입은 `/docs/`).
@@ -22,8 +27,8 @@ docs/index.html ← 위 파일들을 fetch해 렌더링하는 단일 파일 대�
 
 ## 불변 원칙 (수정 시 반드시 지킬 것)
 
-1. **원본 데일리 JSON은 생성 후 불변.** 정정이 필요하면 새 커밋으로 파일을
-   교체하고, 파생물(rollup·리뷰)은 재생성한다.
+1. **원본 run JSON은 생성 후 불변이며 run 시퀀스는 append-only.** 정정이
+   필요하면 새 커밋으로 파일을 교체하고, 파생물(rollup·리뷰)은 재생성한다.
 2. **구성 id와 디렉토리명은 최초 부여 후 불변.** 이름 변경·추가·중단은
    `results/configs.json`의 메타데이터(`dobee_name`/`renamed_from`/`since`/
    `retired`)로만 반영한다. 디렉토리 rename 금지.

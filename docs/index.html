@@ -172,6 +172,8 @@
   .all-green-line { color: var(--good-text); font-size: 13px; margin-top: 12px;
                     border-top: 1px solid var(--grid); padding-top: 10px; }
   .not-op-line { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  .runs-line { color: var(--ink-2); font-size: 12.5px; margin-top: 10px; }
+  .runs-line .runs-sep { color: var(--muted); }
   a { color: var(--accent); }
 
   #error-box { display: none; border: 1px solid var(--critical); color: var(--critical);
@@ -347,7 +349,9 @@ async function load() {
 async function dailyOf(cfgId, date) {
   const key = `${cfgId}/${date}`;
   if (!state.daily[key]) {
-    state.daily[key] = await fetchJson(new URL(`${cfgId}/${date}.json`, DATA_BASE));
+    // 날짜별 대표 = 그날 마지막 run — 파일 경로는 index rollup이 알려준다
+    const row = dayRow(cfgId, date);
+    state.daily[key] = await fetchJson(new URL(row.file, DATA_BASE));
   }
   return state.daily[key];
 }
@@ -682,6 +686,18 @@ async function renderDetail() {
   const detail = $("detail");
   detail.replaceChildren();
 
+  // 그날의 pegging run 체인 (전 구성 공통 — 첫 운영 구성 기준)
+  const opRow = state.configs.map((c) => dayRow(c.id, state.selectedDate)).find(Boolean);
+  if (opRow?.runs) {
+    const line = el("div", "runs-line");
+    line.appendChild(el("span", null, `pegging ${opRow.runs.length}건: `));
+    opRow.runs.forEach((r, i) => {
+      if (i > 0) line.appendChild(el("span", "runs-sep", " → "));
+      line.appendChild(el("span", "mono", r.pegging_sha));
+    });
+    detail.appendChild(line);
+  }
+
   // 미운영 구성은 index rollup으로 사전 판별 — 데일리 파일 fetch 자체를 생략
   const days = await Promise.all(
     state.configs.map((cfg) => dayRow(cfg.id, state.selectedDate)
@@ -733,8 +749,10 @@ async function renderDetail() {
       tr.appendChild(el("td", "mono", tc));
 
       const tdSt = el("td");
-      if (f.status === "new") {
+      if (f.since === state.selectedDate) {  // 당일 유입 (run 중간 유입 포함)
         tdSt.appendChild(el("span", "badge-new", "신규"));
+        tdSt.appendChild(document.createElement("br"));
+        tdSt.appendChild(el("span", "since mono", `@ ${f.since_sha}`));
       } else {
         tdSt.appendChild(el("span", "st-ongoing", "지속"));
         tdSt.appendChild(document.createElement("br"));

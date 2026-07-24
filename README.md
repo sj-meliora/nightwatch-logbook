@@ -8,8 +8,9 @@ daily regression 결과를 기록하는 로그북 repo의 PoC입니다.
 ```
 results/
 ├─ configs.json                  # 구성 목록 매니페스트 (대시보드가 구성을 하드코딩하지 않도록)
-├─ {config}/{YYYY-MM-DD}.json    # 데일리 원본 — 생성 후 불변, JSON이 source of truth
-└─ {config}/index.json           # 파생 rollup — 날짜별 summary 배열, 매일 재생성
+├─ {config}/runs/{date}-{run_id}-{sha7}.json
+│                                # 원본 — 구성×run(pegging)당 1개, 생성 후 불변
+└─ {config}/index.json           # 파생 rollup — 날짜별 대표(마지막 run) + run 체인
 reviews/
 ├─ daily/{YYYY-MM-DD}.md         # agent 생성 데일리 리뷰 초안 (당번 검수용)
 └─ monthly/{YYYY-MM}.md          # 월간 회고/성과 보고용 리뷰 (매핑 커버리지 포함)
@@ -19,20 +20,26 @@ scripts/
 └─ generate_sample_data.py       # 예시 데이터 생성기 (2026-07-14 ~ 07-23, 구성 3개)
 ```
 
-### 데일리 JSON 스키마 (`schema_version: 1`)
+### run JSON 스키마 (`schema_version: 2`)
+
+dobee는 integration의 pegging sha(FTL sha와 1:1) 단위로 전 구성을 테스트하며,
+원본 파일 단위 = 쓰기 이벤트 단위 = **구성 × run**입니다.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "config": "cfg-a",
   "date": "2026-07-23",
-  "summary": { "total": 900, "pass": 872, "fail": 28, "new_fail": 3 },
+  "run_id": 8877,
+  "pegging_sha": "a3f9c21",
+  "summary": { "total": 900, "pass": 873, "fail": 27, "new_fail": 2 },
   "failures": {
     "TC_FTL_GC_017": {
       "status": "new",
       "since": "2026-07-23",
+      "since_sha": "a3f9c21",
       "log_excerpt": "ASSERT at gc_victim.c:412 ...",
-      "log_url": "https://dobee.example.internal/run/8799/tc/TC_FTL_GC_017",
+      "log_url": "https://dobee.example.internal/run/8877/tc/TC_FTL_GC_017",
       "suspect_sha": "a3f9c21",
       "confidence": "high"
     }
@@ -43,12 +50,16 @@ scripts/
 - `failures`는 배열이 아닌 **TC 이름 키 객체 + 키 정렬 + pretty print** —
   git diff 자체가 TC 추가/제거를 사람이 읽을 수 있는 형태로 보여줍니다.
 - 실패 로그는 **발췌 + 링크만** 커밋하고 원본은 dobee URL을 참조합니다.
+- diff는 **run 시퀀스 기준**입니다: 직전 run에서 pass → 이번 run에서 fail =
+  신규 (`status: new`, `since_sha` = 이 run의 pegging). 후보 변경점은
+  `(직전 pegging..since_sha]` 구간의 FTL 커밋들 — pegging=FTL 1:1이라
+  `git log`로 정확히 열거됩니다.
 - `suspect_sha` / `confidence`(high·medium·unknown)는 **agent 추정 결과**로,
-  dobee가 알려주는 사실(로그)과 구분됩니다.
+  dobee가 알려주는 사실(status/since/since_sha/로그)과 구분됩니다.
 - **회사 AI 정책: 개발자 아이디는 repo에 기록하지 않습니다.** suspect는 sha로만
   기록하고, 분석 의뢰 발송 단계에서 내부 시스템으로 sha → 개발자를 조회합니다.
-- git 이력이 시계열 DB 역할을 합니다: 전날 대비 diff는 파일 비교,
-  fail 시작 시점은 `git log`로 추적합니다.
+- git 이력이 시계열 DB 역할을 합니다. 리뷰·대시보드의 날짜 축은 소비용
+  뷰이고, 날짜별 대표는 그날 마지막 run입니다.
 
 ### 구성 생애주기 (configs.json)
 
@@ -97,8 +108,10 @@ GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가
 python3 scripts/generate_sample_data.py
 ```
 
-구성은 11개(`cfg-a` ~ `cfg-k`, TC 150~900)로, 만성 fail 위에 신규/해소
-에피소드가 오가는 시나리오입니다. `cfg-a`(FTL full regression, TC 900)의
+구성 9개(운영 8 + 중단 1, TC 150~900) × 하루 2~3 run — 만성 fail 위에
+신규/해소 에피소드가 run 단위로 유입되는 시나리오입니다 (`RUN_TIMELINE` +
+`Episode.onset`이 유입 run을 결정). 탈락한 id(cfg-e/h/j)는 결번으로
+남습니다 — id는 재사용하지 않습니다. `cfg-a`(FTL full regression, TC 900)의
 7/23은 설계 문서 예시(900/872/28/신규 3)와 일치하고, `cfg-a`와 `cfg-d`에
 같은 변경점(`a3f9c21`)이 의심되는 교차 구성 신호도 포함되어 있습니다.
 `cfg-c`/`cfg-h`는 대부분 all green입니다.

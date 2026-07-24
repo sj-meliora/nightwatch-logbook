@@ -25,11 +25,6 @@
       "total": 300
     },
     {
-      "id": "cfg-e",
-      "label": "power loss recovery",
-      "total": 250
-    },
-    {
       "id": "cfg-f",
       "label": "IO performance",
       "total": 500
@@ -40,19 +35,9 @@
       "total": 350
     },
     {
-      "id": "cfg-h",
-      "label": "security & sanitize",
-      "total": 180
-    },
-    {
       "id": "cfg-i",
       "label": "compat matrix",
       "total": 600
-    },
-    {
-      "id": "cfg-j",
-      "label": "wear leveling soak",
-      "total": 220
     },
     {
       "id": "cfg-k",
@@ -67,5 +52,5 @@
       "total": 190
     }
   ],
-  "schema_version": 1
+  "schema_version": 2
 }
