@@ -9,8 +9,10 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 
 ```
 1. setup_workspace.sh            # 스킬 소유 — repo clone까지만
-2. 미처리 run 열거                # 마지막 적재 run 이후의 pegging들 (run_id 오름차순)
-3. run마다: dobee parse-result → ingest_run.py
+2. status.py                     # 구성별 마지막 적재 run 조회 (읽기 전용)
+   └ 미처리 run = dobee에서 각 구성의 last_run.run_id 이후 pegging들.
+     구성별 값이 다를 수 있다(직전 실행이 중간 실패한 경우) — 구성별로 재개
+3. run마다: dobee parse-result → ingest_run.py (run_id 오름차순)
    └ stdout: new[] = 이 run에서 유입된 신규 fail (로그 발췌 포함)
              ftl_range = "직전pegging..이번pegging" — 후보 변경점 구간
 4. (LLM) 신규 fail마다 `git log <ftl_range>`로 후보 FTL 커밋 조회 → 매핑
@@ -52,6 +54,7 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 | 파일 | 역할 |
 |---|---|
 | `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
+| `status.py` | 구성별 마지막 적재 run 조회 — 미처리 run 열거의 기준점 (읽기 전용) |
 | `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
