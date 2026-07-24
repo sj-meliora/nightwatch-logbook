@@ -1,37 +1,25 @@
 #!/usr/bin/env python3
-"""열흘치 daily regression log 예시 데이터를 생성한다 (구성 11개 + 데일리 리포트).
+"""열흘치 daily regression log 예시 데이터를 생성한다 (구성 12개 + 리뷰).
 
-실제 운영에서는 스케줄 워크플로우가 dobee 결과를 파싱해 데일리 파일을
-커밋하지만, 이 스크립트는 대시보드/스키마 검증용 예시 데이터를 만든다.
-
-원칙 (설계 문서와 동일):
-- 데일리 파일은 생성 후 불변, JSON이 source of truth
-- failures는 배열이 아닌 TC 이름 키 객체, 키 정렬 + pretty print
-  → git diff가 TC 추가/제거를 사람이 읽을 수 있게 보여준다
-- suspect_sha/confidence는 agent 추정 결과로, dobee 사실(로그)과 구분
-- 회사 AI 정책: 개발자 아이디는 repo 데이터에 기록하지 않는다.
-  suspect는 sha로만 기록하고, 분석 의뢰 발송 단계에서 내부 시스템으로
-  sha → 개발자를 조회한다
-- index.json은 데일리 파일에서 파생되는 rollup으로, 매일 재생성
-- reviews/daily/{date}.md는 agent가 매일 생성하는 당번 검수용 리뷰 초안
-- reviews/monthly/{YYYY-MM}.md는 월간 회고/성과 보고용 리뷰 (매핑 커버리지 포함)
+이 파일은 **시나리오 정의(에피소드)**만 소유한다. 직렬화·diff·rollup·md
+템플릿은 전부 logbook 공용 모듈을 호출한다 — production 파이프라인
+(ingest_daily / apply_mapping / build_rollup / render_reviews)과 같은
+쓰기 경로를 지나므로 예시 데이터가 스키마·템플릿과 어긋날 수 없다.
 
 사용법: python3 scripts/generate_sample_data.py  (repo 루트에서 실행)
 """
 
-import json
+import sys
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import logbook
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-RESULTS_DIR = REPO_ROOT / "results"
-REVIEWS_DIR = REPO_ROOT / "reviews"
-SCHEMA_VERSION = 1
 
 DATES = [date(2026, 7, 14) + timedelta(days=i) for i in range(10)]
-
-CONF_KO = {"high": "높음", "medium": "추정", "unknown": "불명"}
 
 
 @dataclass
@@ -256,316 +244,73 @@ def op_dates(cfg: dict, dates: list[date]) -> list[date]:
     return [d for d in dates if op_on(cfg, d)]
 
 
-def write_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8")
-
-
 def run_id_for(cfg_idx: int, d: date) -> int:
     # dobee run 번호 흉내: 구성/날짜별로 안정적인 가짜 번호
     return 3000 + cfg_idx * 700 + (d - DATES[0]).days * 11
 
 
-# ---------------------------------------------------------------- 리포트
-def build_report(d: date, prev: date | None) -> str:
-    """reviews/daily/{date}.md — agent가 데일리 데이터에서 생성하는 사람용 리뷰 초안."""
-    total_fail = prev_fail = 0
-    new_entries: list[tuple[str, Episode]] = []
-    fixed_entries: list[tuple[str, Episode]] = []
-    ongoing: list[tuple[str, Episode]] = []
-    per_cfg_new: list[tuple[str, int]] = []
-    per_cfg_delta: list[tuple[str, int]] = []
-    green: list[str] = []
-
-    for cfg in CONFIGS:
-        if not op_on(cfg, d):
-            continue
-        active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
-        total_fail += len(active)
-        if prev and op_on(cfg, prev):  # 전일도 운영된 구성만 like-for-like 비교
-            cfg_prev = sum(1 for ep in cfg["episodes"] if ep.active_on(prev))
-            prev_fail += cfg_prev
-            if len(active) != cfg_prev:
-                per_cfg_delta.append((cfg["id"], len(active) - cfg_prev))
-        news = [ep for ep in active if ep.since == d]
-        if news:
-            per_cfg_new.append((cfg["id"], len(news)))
-        new_entries += [(cfg["id"], ep) for ep in news]
-        fixed_entries += [(cfg["id"], ep) for ep in cfg["episodes"] if ep.until == d]
-        ongoing += [(cfg["id"], ep) for ep in active if ep.since < d]
-        if not active:
-            green.append(cfg["id"])
-
-    L: list[str] = []
-    L.append(f"# Daily Regression Review — {d.isoformat()}")
-    L.append("")
-    L.append("> agent 생성 초안 — 당번 검수 후 분석 의뢰를 발송한다. "
-             "회사 AI 정책에 따라 개발자 아이디는 기록하지 않으며, "
-             "의뢰 발송 단계에서 suspect sha로 내부 조회한다.")
-    L.append("")
-    L.append("## 요약")
-    L.append("")
-    delta = ""
-    if prev:
-        diff = total_fail - prev_fail
-        delta = f" (전일 대비 {'+' if diff > 0 else ''}{diff})" if diff != 0 else " (전일과 동일)"
-    L.append(f"- 전체 fail **{total_fail}건**{delta} · 신규 **{len(new_entries)}건** · "
-             f"해소 **{len(fixed_entries)}건**")
-    if prev:
-        if per_cfg_delta:
-            per_cfg_delta.sort(key=lambda t: (-t[1], t[0]))
-            L.append("- 전일 대비 증감: " + " · ".join(
-                f"**{cid}** {'+' if n > 0 else ''}{n}" for cid, n in per_cfg_delta)
-                + " (그 외 변동 없음)")
-        else:
-            L.append("- 전일 대비 증감: 전 구성 변동 없음")
-    if per_cfg_new:
-        L.append("- 구성별 신규: " + " · ".join(f"**{cid}** {n}건" for cid, n in per_cfg_new))
-    if green:
-        L.append(f"- fail 없는 구성: {', '.join(green)}")
-    lifecycle = [f"**{cfg['id']}** 운영 시작" for cfg in CONFIGS
-                 if cfg.get("since") == d.isoformat()]
-    lifecycle += [f"**{cfg['id']}** 운영 중단" for cfg in CONFIGS
-                  if cfg.get("retired") == d.isoformat()]
-    if lifecycle:
-        L.append("- 구성 변경: " + " · ".join(lifecycle)
-                 + " (전일 대비 수치는 양일 모두 운영된 구성 기준)")
-    L.append("")
-
-    L.append("## 신규 fail — 변경점별 분석")
-    L.append("")
-    if not new_entries:
-        L.append("신규 fail 없음.")
-        L.append("")
-    else:
-        groups: dict[str | None, list[tuple[str, Episode]]] = {}
-        for cid, ep in new_entries:
-            groups.setdefault(ep.suspect_sha, []).append((cid, ep))
-        shas = [s for s in groups if s is not None] + ([None] if None in groups else [])
-        for sha in shas:
-            entries = groups[sha]
-            L.append(f"### {sha if sha else '원인 미상'}")
-            L.append("")
-            for cid, ep in entries:
-                conf = f" (확신도 {CONF_KO.get(ep.confidence, '불명')})" if ep.confidence else ""
-                L.append(f"- **{cid}** `{ep.tc}`{conf}: {ep.log_excerpt}")
-            L.append("")
-            if sha is None:
-                L.append("변경점 매핑에 실패했다. 로그 기반 수동 분석이 필요하다.")
-            elif len(entries) > 1:
-                cfgs = ", ".join(sorted({cid for cid, _ in entries}))
-                L.append(f"동일 변경점 `{sha}`가 {len(entries)}건의 신규 fail({cfgs})에 "
-                         f"걸려 있다. 교차 구성 회귀 가능성이 높아 우선 분석 대상이다.")
-            else:
-                L.append(f"`{sha}` 변경점에 대한 분석 의뢰 대상이다.")
-            L.append("")
-
-    if fixed_entries:
-        L.append("## 해소")
-        L.append("")
-        for cid, ep in fixed_entries:
-            L.append(f"- **{cid}** `{ep.tc}` — {ep.since.isoformat()}부터 지속되던 fail 해소")
-        L.append("")
-
-    L.append("## 지속 관찰")
-    L.append("")
-    if ongoing:
-        oldest = sorted(ongoing, key=lambda t: t[1].since)[:5]
-        L.append(f"지속 fail {len(ongoing)}건. 최장기 5건:")
-        L.append("")
-        for cid, ep in oldest:
-            L.append(f"- **{cid}** `{ep.tc}` — since {ep.since.isoformat()}")
-    else:
-        L.append("지속 fail 없음.")
-    L.append("")
-    return "\n".join(L)
-
-
-def build_monthly_report(month_dates: list[date]) -> str:
-    """reviews/monthly/{YYYY-MM}.md — 월간 회고/성과 보고용 리뷰.
-
-    데일리와 달리 의뢰 액션이 아닌 집계가 목적: 구성별 월초→월말 현황,
-    변경점 매핑 커버리지(정확도 측정 근거), 교차 구성 회귀 이력, 만성 fail.
-    """
-    first, last = month_dates[0], month_dates[-1]
-    ym = first.strftime("%Y-%m")
-
-    rows = []            # (cfg_id, 월초 fail, 월말 fail, 신규, 해소)
-    total_new = total_fixed = 0
-    new_by_sha: dict[str, list[tuple[str, date, Episode]]] = {}
-    conf_count: dict[str, int] = {}
-    unmapped: list[tuple[str, Episode]] = []
-    chronic_all: list[tuple[str, Episode]] = []
-
-    for cfg in CONFIGS:
-        ods = op_dates(cfg, month_dates)
-        if not ods:
-            continue
-        c_first, c_last = ods[0], ods[-1]  # 이 구성의 월내 운영 구간
-        name = cfg["id"]
-        if "since" in cfg and d_(cfg["since"]) == c_first and c_first != first:
-            name += f" ({c_first.strftime('%m/%d')}~)"
-        if "retired" in cfg and c_last != last:
-            name += f" (~{c_last.strftime('%m/%d')})"
-        eps = cfg["episodes"]
-        start_fail = sum(1 for ep in eps if ep.active_on(c_first))
-        end_fail = sum(1 for ep in eps if ep.active_on(c_last))
-        news = [ep for ep in eps if c_first <= ep.since <= c_last]
-        fixed = [ep for ep in eps if ep.until and c_first <= ep.until <= c_last]
-        rows.append((name, start_fail, end_fail, len(news), len(fixed)))
-        total_new += len(news)
-        total_fixed += len(fixed)
-        for ep in news:
-            if ep.suspect_sha:
-                new_by_sha.setdefault(ep.suspect_sha, []).append((cfg["id"], ep.since, ep))
-                conf_count[ep.confidence or "unknown"] = \
-                    conf_count.get(ep.confidence or "unknown", 0) + 1
-            else:
-                unmapped.append((cfg["id"], ep))
-        chronic_all += [(cfg["id"], ep) for ep in eps
-                        if ep.active_on(c_first) and ep.active_on(c_last)
-                        and ep.since < c_first]
-
-    day_totals = [sum(1 for cfg in CONFIGS if op_on(cfg, d)
-                      for ep in cfg["episodes"] if ep.active_on(d))
-                  for d in month_dates]
-    mapped = total_new - len(unmapped)
-    cover = round(mapped / total_new * 100) if total_new else 0
-
-    L: list[str] = []
-    L.append(f"# Monthly Regression Review — {ym}")
-    L.append("")
-    L.append(f"> agent 생성 초안 — 월간 회고/성과 보고용. 데이터 범위: "
-             f"{first.isoformat()} ~ {last.isoformat()} ({len(month_dates)}일). "
-             "회사 AI 정책에 따라 개발자 아이디는 기록하지 않는다.")
-    L.append("")
-    L.append("## 월간 요약")
-    L.append("")
-    L.append(f"- 전체 fail: 월초 **{day_totals[0]}건** → 월말 **{day_totals[-1]}건** "
-             f"(최저 {min(day_totals)} · 최고 {max(day_totals)})")
-    L.append(f"- 신규 **{total_new}건** · 해소 **{total_fixed}건**")
-    conf_str = " · ".join(f"{CONF_KO.get(k, k)} {v}" for k, v in
-                          sorted(conf_count.items(),
-                                 key=lambda kv: ["high", "medium", "unknown"].index(kv[0])))
-    L.append(f"- 변경점 매핑: 신규 {total_new}건 중 **{mapped}건 매핑 ({cover}%)**"
-             + (f" — 확신도 {conf_str}" if conf_str else ""))
-    L.append("")
-
-    L.append("## 구성별 현황")
-    L.append("")
-    L.append("| 구성 | 월초 fail | 월말 fail | 신규 | 해소 |")
-    L.append("|---|---|---|---|---|")
-    for cid, s, e, n, f in rows:
-        L.append(f"| {cid} | {s} | {e} | {n if n else '·'} | {f if f else '·'} |")
-    L.append("")
-
-    L.append("## 변경점별 신규 fail 이력")
-    L.append("")
-    if new_by_sha:
-        for sha, entries in sorted(new_by_sha.items(),
-                                   key=lambda kv: (min(e[1] for e in kv[1]), kv[0])):
-            cfgs = sorted({cid for cid, _, _ in entries})
-            dates_s = sorted({s.strftime("%m/%d") for _, s, _ in entries})
-            cross = " — **교차 구성 회귀**" if len(cfgs) > 1 else ""
-            L.append(f"- `{sha}` ({', '.join(dates_s)}) · {len(entries)}건 · "
-                     f"{', '.join(cfgs)}{cross}")
-            for cid, _, ep in entries:
-                L.append(f"  - {cid} `{ep.tc}` (확신도 {CONF_KO.get(ep.confidence, '불명')})")
-    else:
-        L.append("매핑된 신규 fail 없음.")
-    L.append("")
-    if unmapped:
-        L.append(f"원인 미상 신규 {len(unmapped)}건 — 매핑 실패 사례로 회고 대상:")
-        L.append("")
-        for cid, ep in unmapped:
-            L.append(f"- {cid} `{ep.tc}` ({ep.since.strftime('%m/%d')})")
-        L.append("")
-
-    L.append("## 만성 fail (월 전체 지속)")
-    L.append("")
-    L.append(f"월초부터 월말까지 계속 fail인 TC **{len(chronic_all)}건**. 최장기 5건:")
-    L.append("")
-    for cid, ep in sorted(chronic_all, key=lambda t: t[1].since)[:5]:
-        L.append(f"- **{cid}** `{ep.tc}` — since {ep.since.isoformat()}")
-    L.append("")
-    return "\n".join(L)
-
-
 def main() -> None:
-    manifest = {"schema_version": SCHEMA_VERSION, "configs": []}
-
-    for ci, cfg in enumerate(CONFIGS):
-        cfg_dir = RESULTS_DIR / cfg["id"]
-        rollup_days = []
-
-        for d in op_dates(cfg, DATES):  # 운영 기간의 데일리 파일만 존재
-            active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
-            failures = {}
-            for ep in active:
-                failures[ep.tc] = {
-                    "status": "new" if ep.since == d else "ongoing",
-                    "since": ep.since.isoformat(),
-                    "log_excerpt": ep.log_excerpt,
-                    "log_url": (f"https://dobee.example.internal/run/"
-                                f"{run_id_for(ci, d)}/tc/{ep.tc}"),
-                    "suspect_sha": ep.suspect_sha,
-                    "confidence": ep.confidence,
-                }
-
-            summary = {
-                "total": cfg["total"],
-                "pass": cfg["total"] - len(active),
-                "fail": len(active),
-                "new_fail": sum(1 for ep in active if ep.since == d),
-            }
-            write_json(cfg_dir / f"{d.isoformat()}.json", {
-                "schema_version": SCHEMA_VERSION,
-                "config": cfg["id"],
-                "date": d.isoformat(),
-                "summary": summary,
-                "failures": failures,
-            })
-            rollup_days.append({"date": d.isoformat(), **summary})
-
-        # index.json — 데일리 파일에서 파생되는 rollup (agent가 매일 재생성)
-        write_json(cfg_dir / "index.json", {
-            "schema_version": SCHEMA_VERSION,
-            "config": cfg["id"],
-            "label": cfg["label"],
-            "updated": DATES[-1].isoformat(),
-            "days": rollup_days,
-        })
+    manifest = {"schema_version": logbook.SCHEMA_VERSION, "configs": []}
+    for cfg in CONFIGS:
         entry = {"id": cfg["id"], "label": cfg["label"], "total": cfg["total"]}
         for key in ("dobee_name", "renamed_from", "since", "retired"):
             if key in cfg:
                 entry[key] = cfg[key]
         manifest["configs"].append(entry)
-        print(f"{cfg['id']}: {len(rollup_days)} daily files, "
-              f"fail {rollup_days[0]['fail']} -> {rollup_days[-1]['fail']}")
+    logbook.write_json(REPO_ROOT / "results" / "configs.json", manifest)
 
-    # 대시보드가 구성 목록을 하드코딩하지 않도록 하는 매니페스트
-    write_json(RESULTS_DIR / "configs.json", manifest)
-    print(f"wrote {RESULTS_DIR / 'configs.json'}")
+    last_iso = DATES[-1].isoformat()
+    for ci, cfg in enumerate(CONFIGS):
+        ods = op_dates(cfg, DATES)
+        # 윈도우 전날의 가상 데일리 — 만성 fail의 since/추정 필드를 시드한다.
+        # (production에서는 실제 전일 파일이 이 역할을 한다)
+        prev_daily = None
+        if ods:
+            day0 = ods[0] - timedelta(days=1)
+            seeded = {ep.tc: {
+                "status": "ongoing", "since": ep.since.isoformat(),
+                "log_excerpt": ep.log_excerpt, "log_url": "",
+                "suspect_sha": ep.suspect_sha, "confidence": ep.confidence,
+            } for ep in cfg["episodes"] if ep.active_on(day0)}
+            if seeded:
+                prev_daily = {"date": day0.isoformat(), "failures": seeded}
+        n_files = 0
+        for d in ods:
+            iso = d.isoformat()
+            active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
+            # dobee parse-result가 내놓는 facts 형태
+            facts = {ep.tc: {
+                "log_excerpt": ep.log_excerpt,
+                "log_url": (f"https://dobee.example.internal/run/"
+                            f"{run_id_for(ci, d)}/tc/{ep.tc}"),
+            } for ep in active}
+            daily = logbook.build_daily(cfg["id"], iso, cfg["total"], facts, prev_daily)
+            # 에피소드에 정의된 agent 추정 결과 = production의 mapping.json 역할
+            logbook.apply_entries(daily, [
+                {"tc": ep.tc, "suspect_sha": ep.suspect_sha, "confidence": ep.confidence}
+                for ep in active if ep.since == d and ep.suspect_sha])
+            logbook.write_json(logbook.daily_path(REPO_ROOT, cfg["id"], iso), daily)
+            prev_daily = daily
+            n_files += 1
+        meta = manifest["configs"][ci]
+        rollup = logbook.write_rollup(REPO_ROOT, meta, updated=last_iso)
+        print(f"{cfg['id']}: {n_files} daily files, "
+              f"fail {rollup['days'][0]['fail']} -> {rollup['days'][-1]['fail']}")
 
-    # 데일리 리포트 (당번 검수용 리뷰 초안)
-    daily_dir = REVIEWS_DIR / "daily"
+    # 리뷰 렌더링 — production의 render_reviews.py와 동일 경로
+    daily_dir = REPO_ROOT / "reviews" / "daily"
     daily_dir.mkdir(parents=True, exist_ok=True)
-    for i, d in enumerate(DATES):
-        prev = DATES[i - 1] if i > 0 else None
-        (daily_dir / f"{d.isoformat()}.md").write_text(build_report(d, prev), encoding="utf-8")
-    print(f"wrote {len(DATES)} daily reports to {daily_dir}")
-
-    # 먼슬리 리뷰 (회고/성과 보고용) — 월 단위로 그룹핑해 생성
-    monthly_dir = REVIEWS_DIR / "monthly"
-    monthly_dir.mkdir(parents=True, exist_ok=True)
-    months: dict[str, list[date]] = {}
     for d in DATES:
-        months.setdefault(d.strftime("%Y-%m"), []).append(d)
-    for ym, month_dates in months.items():
-        (monthly_dir / f"{ym}.md").write_text(build_monthly_report(month_dates),
-                                              encoding="utf-8")
-    print(f"wrote {len(months)} monthly reviews to {monthly_dir}")
+        iso = d.isoformat()
+        (daily_dir / f"{iso}.md").write_text(
+            logbook.render_daily_md(REPO_ROOT, manifest, iso), encoding="utf-8")
+    monthly_dir = REPO_ROOT / "reviews" / "monthly"
+    monthly_dir.mkdir(parents=True, exist_ok=True)
+    for ym in sorted({d.strftime("%Y-%m") for d in DATES}):
+        (monthly_dir / f"{ym}.md").write_text(
+            logbook.render_monthly_md(REPO_ROOT, manifest, ym), encoding="utf-8")
+    print(f"wrote {len(DATES)} daily reports, "
+          f"{len({d.strftime('%Y-%m') for d in DATES})} monthly reviews")
 
 
 if __name__ == "__main__":
