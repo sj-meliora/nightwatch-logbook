@@ -108,9 +108,10 @@ GitHub Pages: Pages 소스를 **root**로 설정하면 `/docs/`에서 접근 가
 python3 scripts/generate_sample_data.py
 ```
 
-구성 12개(운영 11 + 중단 1, TC 150~900) × 하루 2~3 run — 만성 fail 위에
+구성 9개(운영 8 + 중단 1, TC 150~900) × 하루 2~3 run — 만성 fail 위에
 신규/해소 에피소드가 run 단위로 유입되는 시나리오입니다 (`RUN_TIMELINE` +
-`Episode.onset`이 유입 run을 결정). `cfg-a`(FTL full regression, TC 900)의
+`Episode.onset`이 유입 run을 결정). 탈락한 id(cfg-e/h/j)는 결번으로
+남습니다 — id는 재사용하지 않습니다. `cfg-a`(FTL full regression, TC 900)의
 7/23은 설계 문서 예시(900/872/28/신규 3)와 일치하고, `cfg-a`와 `cfg-d`에
 같은 변경점(`a3f9c21`)이 의심되는 교차 구성 신호도 포함되어 있습니다.
 `cfg-c`/`cfg-h`는 대부분 all green입니다.

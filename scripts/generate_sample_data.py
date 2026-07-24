@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """열흘치 daily regression log 예시 데이터를 생성한다 (schema v2 — run 단위).
 
+구성은 운영 8개 + 중단 1개. 탈락한 id(cfg-e/h/j)는 재사용하지 않는다
+(id 불변 원칙 — 결번 유지).
+
 이 파일은 **시나리오 정의(run 타임라인 + 에피소드)**만 소유한다.
 직렬화·diff·rollup·md 템플릿은 전부 logbook 공용 모듈을 호출한다 —
 production 파이프라인(ingest_run / apply_mapping / build_rollup /
@@ -150,15 +153,6 @@ CFG_D = chronic([
             suspect_sha="a3f9c21", confidence="medium", onset=1),
 ]
 
-# ---------------------------------------------------------------- cfg-e
-CFG_E = chronic([
-    ("TC_PLR_SPOR_009", "2026-06-30", "spor iteration 412 mount fail, dirty map"),
-    ("TC_PLR_CAP_021",  "2026-07-08", "cap discharge curve below spec at 85C"),
-]) + [
-    Episode("TC_PLR_NESTED_033", d_("2026-07-12"), d_("2026-07-20"),
-            "nested power cut during replay corrupts journal tail"),
-]
-
 # ---------------------------------------------------------------- cfg-f
 CFG_F = chronic([
     ("TC_PERF_SEQW_005",    "2026-07-06", "seq write 2.1GB/s < target 2.4GB/s"),
@@ -179,9 +173,6 @@ CFG_G = chronic([
             suspect_sha="77d0e4f", confidence="medium", onset=2),
 ]
 
-# ---------------------------------------------------------------- cfg-h (전 기간 green)
-CFG_H: list[Episode] = []
-
 # ---------------------------------------------------------------- cfg-i
 CFG_I = chronic([
     ("TC_CMP_HOSTA_101", "2026-06-28", "host A hotplug: link retrain loop after s3 resume"),
@@ -192,15 +183,6 @@ CFG_I = chronic([
 ]) + [
     Episode("TC_CMP_HOSTC_128", d_("2026-07-11"), d_("2026-07-21"),
             "host C aspm l1.2 entry storm drops io"),
-]
-
-# ---------------------------------------------------------------- cfg-j
-CFG_J = chronic([
-    ("TC_WLS_STATIC_007", "2026-07-04", "static wl not triggered in 24h soak"),
-    ("TC_WLS_DELTA_019",  "2026-06-29", "erase count delta 512 > limit 384"),
-]) + [
-    Episode("TC_WLS_MIGRATE_028", d_("2026-07-19"), None,
-            "wl migration collides with gc, double relocation"),
 ]
 
 # ---------------------------------------------------------------- cfg-k (7/18 운영 시작)
@@ -229,12 +211,9 @@ CONFIGS = [
     {"id": "cfg-b", "label": "NVMe protocol suite",  "total": 420, "episodes": CFG_B},
     {"id": "cfg-c", "label": "smoke suite",          "total": 150, "episodes": CFG_C},
     {"id": "cfg-d", "label": "FTL GC stress",        "total": 300, "episodes": CFG_D},
-    {"id": "cfg-e", "label": "power loss recovery",  "total": 250, "episodes": CFG_E},
     {"id": "cfg-f", "label": "IO performance",       "total": 500, "episodes": CFG_F},
     {"id": "cfg-g", "label": "metadata journal",     "total": 350, "episodes": CFG_G},
-    {"id": "cfg-h", "label": "security & sanitize",  "total": 180, "episodes": CFG_H},
     {"id": "cfg-i", "label": "compat matrix",        "total": 600, "episodes": CFG_I},
-    {"id": "cfg-j", "label": "wear leveling soak",   "total": 220, "episodes": CFG_J},
     {"id": "cfg-k", "label": "thermal & throttle",   "total": 280, "episodes": CFG_K,
      "since": "2026-07-18"},
     {"id": "cfg-l", "label": "legacy sanitize suite", "total": 190, "episodes": CFG_L,
