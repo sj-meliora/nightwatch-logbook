@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""열흘치 daily regression log 예시 데이터를 생성한다 (구성 12개 + 리뷰).
+"""열흘치 daily regression log 예시 데이터를 생성한다 (schema v2 — run 단위).
 
-이 파일은 **시나리오 정의(에피소드)**만 소유한다. 직렬화·diff·rollup·md
-템플릿은 전부 logbook 공용 모듈을 호출한다 — production 파이프라인
-(ingest_daily / apply_mapping / build_rollup / render_reviews)과 같은
-쓰기 경로를 지나므로 예시 데이터가 스키마·템플릿과 어긋날 수 없다.
+이 파일은 **시나리오 정의(run 타임라인 + 에피소드)**만 소유한다.
+직렬화·diff·rollup·md 템플릿은 전부 logbook 공용 모듈을 호출한다 —
+production 파이프라인(ingest_run / apply_mapping / build_rollup /
+render_reviews)과 같은 쓰기 경로를 지나므로 예시 데이터가 스키마·템플릿과
+어긋날 수 없다.
+
+- RUN_TIMELINE: 날짜별 pegging run 목록 (전 구성 공통, pegging = FTL sha 1:1)
+- Episode.onset: 해당 since 날짜의 몇 번째 run부터 fail인지 (0-based)
+  → since_sha가 그 run의 pegging으로 기록된다
 
 사용법: python3 scripts/generate_sample_data.py  (repo 루트에서 실행)
 """
@@ -29,12 +34,18 @@ class Episode:
     since: date
     until: date | None
     log_excerpt: str
-    # agent 추정 필드 (신규 fail 분석 시점에 채워지고 이후 날짜로 승계)
+    # agent 추정 필드 (신규 fail 분석 시점에 채워지고 이후 run으로 승계)
     suspect_sha: str | None = None
     confidence: str | None = None
+    onset: int = 0  # since 날짜의 몇 번째 run부터 fail인지 (0-based)
 
     def active_on(self, d: date) -> bool:
         return self.since <= d and (self.until is None or d < self.until)
+
+    def active_in_run(self, d: date, run_idx: int) -> bool:
+        if not self.active_on(d):
+            return False
+        return run_idx >= self.onset if d == self.since else True
 
 
 def d_(s: str) -> date:
@@ -76,7 +87,7 @@ CFG_A = chronic([
             "spor recovery hang at stage 2, ftl_open() no return"),
     Episode("TC_FTL_MAP_141", d_("2026-07-15"), d_("2026-07-20"),
             "map rebuild reads stale l2p page after unclean shutdown",
-            suspect_sha="9e12ab4", confidence="medium"),
+            suspect_sha="9e12ab4", confidence="medium", onset=1),
     Episode("TC_IO_QD32_055", d_("2026-07-16"), None,
             "hang: qd32 rand write stalls at 97% completion",
             suspect_sha="4c77f02", confidence="unknown"),
@@ -90,10 +101,10 @@ CFG_A = chronic([
     # 2026-07-23 신규 3건 — 설계 문서 예시 시나리오
     Episode("TC_FTL_GC_017", d_("2026-07-23"), None,
             "ASSERT at gc_victim.c:412: invalid victim block state during gc",
-            suspect_sha="a3f9c21", confidence="high"),
+            suspect_sha="a3f9c21", confidence="high", onset=1),
     Episode("TC_FTL_MAP_205", d_("2026-07-23"), None,
             "SEGV in map_cache_evict(), map_cache.c:207",
-            suspect_sha="77d0e4f", confidence="high"),
+            suspect_sha="77d0e4f", confidence="high", onset=2),
     Episode("TC_IO_SEQ_078", d_("2026-07-23"), None,
             "IO latency spike 4200ms > budget 500ms in seq write",
             suspect_sha="c91b502", confidence="medium"),
@@ -116,7 +127,7 @@ CFG_B = chronic([
             "rebuild time 41s > budget 30s on 75% full drive"),
     Episode("TC_IO_WRCACHE_012", d_("2026-07-22"), None,
             "write cache disable ignored under sustained seq write",
-            suspect_sha="5b21d9e", confidence="medium"),
+            suspect_sha="5b21d9e", confidence="medium", onset=1),
 ]
 
 # ---------------------------------------------------------------- cfg-c
@@ -136,7 +147,7 @@ CFG_D = chronic([
     # cfg-a의 TC_FTL_GC_017과 같은 변경점(a3f9c21)이 의심되는 교차 구성 신호
     Episode("TC_GCS_VICTIM_044", d_("2026-07-23"), None,
             "victim pick loops on same block, gc starvation",
-            suspect_sha="a3f9c21", confidence="medium"),
+            suspect_sha="a3f9c21", confidence="medium", onset=1),
 ]
 
 # ---------------------------------------------------------------- cfg-e
@@ -165,7 +176,7 @@ CFG_G = chronic([
 ]) + [
     Episode("TC_MJ_CKPT_022", d_("2026-07-23"), None,
             "checkpoint skip when gc pressure high, journal wrap",
-            suspect_sha="77d0e4f", confidence="medium"),
+            suspect_sha="77d0e4f", confidence="medium", onset=2),
 ]
 
 # ---------------------------------------------------------------- cfg-h (전 기간 green)
@@ -244,9 +255,25 @@ def op_dates(cfg: dict, dates: list[date]) -> list[date]:
     return [d for d in dates if op_on(cfg, d)]
 
 
-def run_id_for(cfg_idx: int, d: date) -> int:
-    # dobee run 번호 흉내: 구성/날짜별로 안정적인 가짜 번호
-    return 3000 + cfg_idx * 700 + (d - DATES[0]).days * 11
+# 날짜별 pegging run 타임라인 — 전 구성 공통, (run_id, pegging_sha=FTL sha)
+RUN_TIMELINE: dict[str, list[tuple[int, str]]] = {
+    "2026-07-14": [(8601, "4e21c9b"), (8613, "a90f735")],
+    "2026-07-15": [(8625, "d7a01f3"), (8637, "9e12ab4"), (8649, "4b8cc02")],
+    "2026-07-16": [(8661, "1c9de55"), (8673, "7e30ba1")],
+    "2026-07-17": [(8685, "f0a9912"), (8697, "3d51c7e"), (8709, "b92aa04")],
+    "2026-07-18": [(8721, "6a8f1d0"), (8733, "e45b992")],
+    "2026-07-19": [(8745, "2f7c6ae"), (8757, "8d19e03"), (8769, "5c02b4f")],
+    "2026-07-20": [(8781, "b8d4310"), (8793, "0a63f17")],
+    "2026-07-21": [(8805, "7b40d2c"), (8817, "c58e9f6"), (8829, "91a3d08")],
+    "2026-07-22": [(8841, "9f4e2b7"), (8853, "5b21d9e")],
+    "2026-07-23": [(8865, "c3d9e10"), (8877, "a3f9c21"), (8889, "77d0e4f")],
+}
+
+
+def seed_sha(tc: str) -> str:
+    """윈도우 이전부터 fail이던 만성 케이스의 가상 유입 pegging (표시용)."""
+    import hashlib
+    return hashlib.md5(tc.encode()).hexdigest()[:7]
 
 
 def main() -> None:
@@ -262,39 +289,43 @@ def main() -> None:
     last_iso = DATES[-1].isoformat()
     for ci, cfg in enumerate(CONFIGS):
         ods = op_dates(cfg, DATES)
-        # 윈도우 전날의 가상 데일리 — 만성 fail의 since/추정 필드를 시드한다.
-        # (production에서는 실제 전일 파일이 이 역할을 한다)
-        prev_daily = None
+        # 윈도우 전 run의 가상 상태 — 만성 fail의 since/since_sha/추정 필드 시드
+        prev_run = None
         if ods:
             day0 = ods[0] - timedelta(days=1)
             seeded = {ep.tc: {
                 "status": "ongoing", "since": ep.since.isoformat(),
+                "since_sha": seed_sha(ep.tc),
                 "log_excerpt": ep.log_excerpt, "log_url": "",
                 "suspect_sha": ep.suspect_sha, "confidence": ep.confidence,
             } for ep in cfg["episodes"] if ep.active_on(day0)}
             if seeded:
-                prev_daily = {"date": day0.isoformat(), "failures": seeded}
-        n_files = 0
+                prev_run = {"date": day0.isoformat(), "pegging_sha": "",
+                            "failures": seeded}
+        n_runs = 0
         for d in ods:
             iso = d.isoformat()
-            active = [ep for ep in cfg["episodes"] if ep.active_on(d)]
-            # dobee parse-result가 내놓는 facts 형태
-            facts = {ep.tc: {
-                "log_excerpt": ep.log_excerpt,
-                "log_url": (f"https://dobee.example.internal/run/"
-                            f"{run_id_for(ci, d)}/tc/{ep.tc}"),
-            } for ep in active}
-            daily = logbook.build_daily(cfg["id"], iso, cfg["total"], facts, prev_daily)
-            # 에피소드에 정의된 agent 추정 결과 = production의 mapping.json 역할
-            logbook.apply_entries(daily, [
-                {"tc": ep.tc, "suspect_sha": ep.suspect_sha, "confidence": ep.confidence}
-                for ep in active if ep.since == d and ep.suspect_sha])
-            logbook.write_json(logbook.daily_path(REPO_ROOT, cfg["id"], iso), daily)
-            prev_daily = daily
-            n_files += 1
+            for run_idx, (rid, sha) in enumerate(RUN_TIMELINE[iso]):
+                active = [ep for ep in cfg["episodes"] if ep.active_in_run(d, run_idx)]
+                facts = {ep.tc: {
+                    "log_excerpt": ep.log_excerpt,
+                    "log_url": f"https://dobee.example.internal/run/{rid}/tc/{ep.tc}",
+                } for ep in active}
+                run = logbook.build_run(cfg["id"], iso, rid, sha,
+                                        cfg["total"], facts, prev_run)
+                # 이 run에서 유입된 에피소드의 agent 추정 = production의 mapping.json 역할
+                logbook.apply_entries(run, [
+                    {"tc": ep.tc, "suspect_sha": ep.suspect_sha,
+                     "confidence": ep.confidence}
+                    for ep in active
+                    if ep.since == d and ep.onset == run_idx and ep.suspect_sha])
+                logbook.write_json(
+                    logbook.run_path(REPO_ROOT, cfg["id"], iso, rid, sha), run)
+                prev_run = run
+                n_runs += 1
         meta = manifest["configs"][ci]
         rollup = logbook.write_rollup(REPO_ROOT, meta, updated=last_iso)
-        print(f"{cfg['id']}: {n_files} daily files, "
+        print(f"{cfg['id']}: {n_runs} runs / {len(rollup['days'])} days, "
               f"fail {rollup['days'][0]['fail']} -> {rollup['days'][-1]['fail']}")
 
     # 리뷰 렌더링 — production의 render_reviews.py와 동일 경로

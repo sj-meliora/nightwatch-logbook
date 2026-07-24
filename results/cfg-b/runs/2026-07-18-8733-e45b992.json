@@ -1,0 +1,69 @@
+{
+  "config": "cfg-b",
+  "date": "2026-07-18",
+  "failures": {
+    "TC_IO_LAT_QOS_021": {
+      "confidence": null,
+      "log_excerpt": "qos class B p95 4.1ms > sla 2.0ms",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_IO_LAT_QOS_021",
+      "since": "2026-06-28",
+      "since_sha": "9e95e8b",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_META_GC_MIX_044": {
+      "confidence": null,
+      "log_excerpt": "gc during meta update drops one dirty page",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_META_GC_MIX_044",
+      "since": "2026-07-06",
+      "since_sha": "d6fec6b",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_NVME_FMT_009": {
+      "confidence": null,
+      "log_excerpt": "format nvm with ses=1 returns invalid field",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_NVME_FMT_009",
+      "since": "2026-07-01",
+      "since_sha": "d642b42",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_NVME_RESET_033": {
+      "confidence": "medium",
+      "log_excerpt": "controller reset during io leaves qpair zombie",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_NVME_RESET_033",
+      "since": "2026-07-17",
+      "since_sha": "f0a9912",
+      "status": "ongoing",
+      "suspect_sha": "f0a9912"
+    },
+    "TC_PWR_CYCLE_202": {
+      "confidence": null,
+      "log_excerpt": "device not ready within 5s after 500th cycle",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_PWR_CYCLE_202",
+      "since": "2026-06-15",
+      "since_sha": "b620157",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_WEAR_STATIC_130": {
+      "confidence": null,
+      "log_excerpt": "static wear leveling never triggers in 24h soak",
+      "log_url": "https://dobee.example.internal/run/8733/tc/TC_WEAR_STATIC_130",
+      "since": "2026-07-11",
+      "since_sha": "99eb590",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "e45b992",
+  "run_id": 8733,
+  "schema_version": 2,
+  "summary": {
+    "fail": 6,
+    "new_fail": 0,
+    "pass": 414,
+    "total": 420
+  }
+}

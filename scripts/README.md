@@ -9,10 +9,13 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 
 ```
 1. setup_workspace.sh            # 스킬 소유 — repo clone까지만
-2. dobee parse-result            # 구성별 결과 페이지 → facts JSON
-3. ingest_daily.py               # facts → 데일리 JSON (전일 diff, since/추정 승계)
-   └ stdout의 new[] = 오늘 매핑해야 할 신규 fail 목록 (로그 발췌 포함)
-4. (LLM) 신규 fail ↔ merge PR 매핑 → mapping.json 작성
+2. 미처리 run 열거                # 마지막 적재 run 이후의 pegging들 (run_id 오름차순)
+3. run마다: dobee parse-result → ingest_run.py
+   └ stdout: new[] = 이 run에서 유입된 신규 fail (로그 발췌 포함)
+             ftl_range = "직전pegging..이번pegging" — 후보 변경점 구간
+4. (LLM) 신규 fail마다 `git log <ftl_range>`로 후보 FTL 커밋 조회 → 매핑
+   → mapping.json 작성. 구간에 커밋이 1개면 사실상 확정(high),
+     구간이 비어 있으면 원인이 FTL 밖 — 매핑하지 말고 unknown으로 남긴다
 5. apply_mapping.py              # 검증 후 추정 필드 기입 (원자적, 실패 시 exit 2)
 6. build_rollup.py               # index.json 재생성
 7. render_reviews.py             # 일간 보고 + 월간 리뷰 렌더링
@@ -32,12 +35,13 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
     "tc": "TC_FTL_GC_017",
     "suspect_sha": "a3f9c21",
     "confidence": "high",
-    "rationale": "fail 위치(gc_victim.c:412)가 해당 PR의 victim 선택 로직 변경 범위와 일치"
+    "rationale": "후보 구간 내 유일한 커밋이며 fail 위치(gc_victim.c:412)가 변경 범위와 일치"
   }
 ]
 ```
 
-- 대상은 그날의 **신규(status=new) fail만** — ingest 출력의 `new[]` 참조
+- 대상은 그날 **신규 유입(since==당일) fail만** — ingest 출력의 `new[]` 참조.
+  해당 TC가 등장하는 당일의 모든 run 파일에 기입된다
 - `confidence`: `high` | `medium` | `unknown`
 - `rationale`(선택)은 일간 보고의 근거 슬롯으로만 삽입된다 — LLM이 md를
   직접 쓰지 않으므로 리포트 서식은 항상 대시보드 렌더러와 호환된다
@@ -47,12 +51,12 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 
 | 파일 | 역할 |
 |---|---|
-| `logbook.py` | 공용 모듈 — 직렬화·전일 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
-| `ingest_daily.py` | facts JSON → `results/{config}/{date}.json` (불변 — 덮어쓰기는 `--force`) |
+| `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
+| `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
 | `render_reviews.py` | `reviews/daily/` + `reviews/monthly/` 렌더링 |
-| `generate_sample_data.py` | 예시 데이터 생성 — 에피소드 정의만 소유, 쓰기는 logbook 경유 |
+| `generate_sample_data.py` | 예시 데이터 생성 — run 타임라인·에피소드 정의만 소유, 쓰기는 logbook 경유 |
 
 예시 데이터와 production이 같은 경로를 지나므로, 쓰기 로직 수정 후
 `python3 scripts/generate_sample_data.py && git diff` 로 회귀를 확인할 수 있다

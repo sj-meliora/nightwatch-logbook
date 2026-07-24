@@ -1,0 +1,24 @@
+{
+  "config": "cfg-g",
+  "date": "2026-07-14",
+  "failures": {
+    "TC_MJ_REPLAY_014": {
+      "confidence": null,
+      "log_excerpt": "replay time 8.4s > budget 5s on full journal",
+      "log_url": "https://dobee.example.internal/run/8601/tc/TC_MJ_REPLAY_014",
+      "since": "2026-07-05",
+      "since_sha": "58f02a0",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "4e21c9b",
+  "run_id": 8601,
+  "schema_version": 2,
+  "summary": {
+    "fail": 1,
+    "new_fail": 0,
+    "pass": 349,
+    "total": 350
+  }
+}

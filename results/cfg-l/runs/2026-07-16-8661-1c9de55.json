@@ -1,0 +1,33 @@
+{
+  "config": "cfg-l",
+  "date": "2026-07-16",
+  "failures": {
+    "TC_LGC_SAN_003": {
+      "confidence": null,
+      "log_excerpt": "sanitize block erase leaves residual mapping",
+      "log_url": "https://dobee.example.internal/run/8661/tc/TC_LGC_SAN_003",
+      "since": "2026-06-20",
+      "since_sha": "063a1a2",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_LGC_SAN_017": {
+      "confidence": null,
+      "log_excerpt": "overwrite pass verify timeout at 96%",
+      "log_url": "https://dobee.example.internal/run/8661/tc/TC_LGC_SAN_017",
+      "since": "2026-07-08",
+      "since_sha": "027b644",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "1c9de55",
+  "run_id": 8661,
+  "schema_version": 2,
+  "summary": {
+    "fail": 2,
+    "new_fail": 0,
+    "pass": 188,
+    "total": 190
+  }
+}

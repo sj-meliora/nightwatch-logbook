@@ -1,0 +1,33 @@
+{
+  "config": "cfg-e",
+  "date": "2026-07-21",
+  "failures": {
+    "TC_PLR_CAP_021": {
+      "confidence": null,
+      "log_excerpt": "cap discharge curve below spec at 85C",
+      "log_url": "https://dobee.example.internal/run/8817/tc/TC_PLR_CAP_021",
+      "since": "2026-07-08",
+      "since_sha": "3c123f6",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PLR_SPOR_009": {
+      "confidence": null,
+      "log_excerpt": "spor iteration 412 mount fail, dirty map",
+      "log_url": "https://dobee.example.internal/run/8817/tc/TC_PLR_SPOR_009",
+      "since": "2026-06-30",
+      "since_sha": "dc67a49",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "c58e9f6",
+  "run_id": 8817,
+  "schema_version": 2,
+  "summary": {
+    "fail": 2,
+    "new_fail": 0,
+    "pass": 248,
+    "total": 250
+  }
+}

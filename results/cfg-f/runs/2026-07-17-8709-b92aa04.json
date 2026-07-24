@@ -1,0 +1,60 @@
+{
+  "config": "cfg-f",
+  "date": "2026-07-17",
+  "failures": {
+    "TC_PERF_LAT_QOS_030": {
+      "confidence": null,
+      "log_excerpt": "p99.99 latency 9.8ms > sla 8ms",
+      "log_url": "https://dobee.example.internal/run/8709/tc/TC_PERF_LAT_QOS_030",
+      "since": "2026-07-09",
+      "since_sha": "ff1232f",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PERF_MIXED_052": {
+      "confidence": null,
+      "log_excerpt": "mixed rw throughput dip after fw slot swap",
+      "log_url": "https://dobee.example.internal/run/8709/tc/TC_PERF_MIXED_052",
+      "since": "2026-07-17",
+      "since_sha": "f0a9912",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PERF_RNDR_018": {
+      "confidence": null,
+      "log_excerpt": "rand read iops 388k < target 420k",
+      "log_url": "https://dobee.example.internal/run/8709/tc/TC_PERF_RNDR_018",
+      "since": "2026-06-24",
+      "since_sha": "bb1efd4",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PERF_SEQW_005": {
+      "confidence": null,
+      "log_excerpt": "seq write 2.1GB/s < target 2.4GB/s",
+      "log_url": "https://dobee.example.internal/run/8709/tc/TC_PERF_SEQW_005",
+      "since": "2026-07-06",
+      "since_sha": "3f77080",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_PERF_SUSTAIN_041": {
+      "confidence": null,
+      "log_excerpt": "sustained write drops 38% after 30min, thermal",
+      "log_url": "https://dobee.example.internal/run/8709/tc/TC_PERF_SUSTAIN_041",
+      "since": "2026-07-01",
+      "since_sha": "a73db81",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "b92aa04",
+  "run_id": 8709,
+  "schema_version": 2,
+  "summary": {
+    "fail": 5,
+    "new_fail": 0,
+    "pass": 495,
+    "total": 500
+  }
+}

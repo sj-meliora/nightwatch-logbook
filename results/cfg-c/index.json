@@ -4,75 +4,230 @@
     {
       "date": "2026-07-14",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-14-8613-a90f735.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "4e21c9b",
+          "run_id": 8601
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "a90f735",
+          "run_id": 8613
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-15",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-15-8649-4b8cc02.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "d7a01f3",
+          "run_id": 8625
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "9e12ab4",
+          "run_id": 8637
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "4b8cc02",
+          "run_id": 8649
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-16",
       "fail": 1,
+      "file": "cfg-c/runs/2026-07-16-8673-7e30ba1.json",
       "new_fail": 1,
       "pass": 149,
+      "runs": [
+        {
+          "fail": 1,
+          "pegging_sha": "1c9de55",
+          "run_id": 8661
+        },
+        {
+          "fail": 1,
+          "pegging_sha": "7e30ba1",
+          "run_id": 8673
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-17",
       "fail": 1,
+      "file": "cfg-c/runs/2026-07-17-8709-b92aa04.json",
       "new_fail": 0,
       "pass": 149,
+      "runs": [
+        {
+          "fail": 1,
+          "pegging_sha": "f0a9912",
+          "run_id": 8685
+        },
+        {
+          "fail": 1,
+          "pegging_sha": "3d51c7e",
+          "run_id": 8697
+        },
+        {
+          "fail": 1,
+          "pegging_sha": "b92aa04",
+          "run_id": 8709
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-18",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-18-8733-e45b992.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "6a8f1d0",
+          "run_id": 8721
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "e45b992",
+          "run_id": 8733
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-19",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-19-8769-5c02b4f.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "2f7c6ae",
+          "run_id": 8745
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "8d19e03",
+          "run_id": 8757
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "5c02b4f",
+          "run_id": 8769
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-20",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-20-8793-0a63f17.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "b8d4310",
+          "run_id": 8781
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "0a63f17",
+          "run_id": 8793
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-21",
       "fail": 1,
+      "file": "cfg-c/runs/2026-07-21-8829-91a3d08.json",
       "new_fail": 1,
       "pass": 149,
+      "runs": [
+        {
+          "fail": 1,
+          "pegging_sha": "7b40d2c",
+          "run_id": 8805
+        },
+        {
+          "fail": 1,
+          "pegging_sha": "c58e9f6",
+          "run_id": 8817
+        },
+        {
+          "fail": 1,
+          "pegging_sha": "91a3d08",
+          "run_id": 8829
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-22",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-22-8853-5b21d9e.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "9f4e2b7",
+          "run_id": 8841
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "5b21d9e",
+          "run_id": 8853
+        }
+      ],
       "total": 150
     },
     {
       "date": "2026-07-23",
       "fail": 0,
+      "file": "cfg-c/runs/2026-07-23-8889-77d0e4f.json",
       "new_fail": 0,
       "pass": 150,
+      "runs": [
+        {
+          "fail": 0,
+          "pegging_sha": "c3d9e10",
+          "run_id": 8865
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "a3f9c21",
+          "run_id": 8877
+        },
+        {
+          "fail": 0,
+          "pegging_sha": "77d0e4f",
+          "run_id": 8889
+        }
+      ],
       "total": 150
     }
   ],
   "label": "smoke suite",
-  "schema_version": 1,
+  "schema_version": 2,
   "updated": "2026-07-23"
 }

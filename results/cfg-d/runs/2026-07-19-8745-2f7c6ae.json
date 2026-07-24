@@ -1,0 +1,42 @@
+{
+  "config": "cfg-d",
+  "date": "2026-07-19",
+  "failures": {
+    "TC_GCS_HOT_COLD_012": {
+      "confidence": null,
+      "log_excerpt": "gc write amp 4.8 > limit 3.5 under hot/cold mix",
+      "log_url": "https://dobee.example.internal/run/8745/tc/TC_GCS_HOT_COLD_012",
+      "since": "2026-07-03",
+      "since_sha": "9234850",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_GCS_RESERVE_031": {
+      "confidence": null,
+      "log_excerpt": "reserve blocks below min watermark after loop 77",
+      "log_url": "https://dobee.example.internal/run/8745/tc/TC_GCS_RESERVE_031",
+      "since": "2026-07-10",
+      "since_sha": "a2bbf4b",
+      "status": "ongoing",
+      "suspect_sha": null
+    },
+    "TC_GCS_URGENT_027": {
+      "confidence": null,
+      "log_excerpt": "urgent gc misses deadline, host write stall 1.2s",
+      "log_url": "https://dobee.example.internal/run/8745/tc/TC_GCS_URGENT_027",
+      "since": "2026-06-26",
+      "since_sha": "5e86178",
+      "status": "ongoing",
+      "suspect_sha": null
+    }
+  },
+  "pegging_sha": "2f7c6ae",
+  "run_id": 8745,
+  "schema_version": 2,
+  "summary": {
+    "fail": 3,
+    "new_fail": 0,
+    "pass": 297,
+    "total": 300
+  }
+}
