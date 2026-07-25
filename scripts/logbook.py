@@ -9,7 +9,8 @@ dobee는 integration에 올라오는 pegging sha(FTL sha와 1:1) 단위로 전 �
 
 - diff는 run 시퀀스 기준: 직전 run에서 pass → 이번 run에서 fail = 신규.
   신규 fail의 후보 변경점은 (직전 run pegging .. 최초 fail run pegging]
-  구간의 FTL 커밋들 — pegging=FTL 1:1이므로 git log로 정확히 열거된다
+  구간의 FTL 커밋들 — resolve_ftl.py가 submodule gitlink 기준으로
+  열거한다 (integration이 reset돼도 안전)
 - 날짜별 대표는 그날 마지막 run. 리뷰의 "신규"는 since(최초 fail 일자)가
   당일인 항목이다 (run 중간에 유입돼 마지막 run까지 fail인 것 포함)
 - md 템플릿은 대시보드 내장 렌더러의 문법 부분집합만 사용한다. LLM 자유

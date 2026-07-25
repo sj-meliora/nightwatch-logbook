@@ -4,8 +4,8 @@
 run은 pegging sha(FTL sha와 1:1) 단위이며 구성별 run 시퀀스에 순서대로
 추가된다. 직전 run과 diff해 status/since/since_sha를 산출하고 추정 필드를
 승계한다. stdout은 JSON 한 덩어리 — 신규 fail 목록(로그 발췌 포함)과
-후보 변경점 구간(ftl_range)을 담고 있어, 호출측 LLM이 바로
-`git log <ftl_range>`로 후보 커밋을 조회할 수 있다.
+후보 변경점 구간(ftl_range)을 담고 있어, 그대로 resolve_ftl.py에 넘겨
+실제 FTL 커밋을 열거할 수 있다.
 
 exit code: 0=성공 / 2=인자·검증 오류 / 3=IO 오류
 """
@@ -100,7 +100,8 @@ def main() -> int:
         "run_id": run_id,
         "pegging_sha": pegging[:7],
         "prev_pegging_sha": prev_run["pegging_sha"] if prev_run else None,
-        # 이 run에서 처음 fail한 TC들의 후보 변경점 구간 (FTL repo 기준)
+        # 이 run에서 처음 fail한 TC들의 후보 변경점 구간 (pegging sha 구간 —
+        # resolve_ftl.py의 입력. integration에서 직접 git log 하지 말 것)
         "ftl_range": (f"{prev_run['pegging_sha']}..{pegging[:7]}" if prev_run else None),
         "summary": run["summary"],
         "new": [{"tc": tc, "log_excerpt": e["log_excerpt"], "log_url": e["log_url"]}

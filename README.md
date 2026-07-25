@@ -52,8 +52,9 @@ dobee는 integration의 pegging sha(FTL sha와 1:1) 단위로 전 구성을 테�
 - 실패 로그는 **발췌 + 링크만** 커밋하고 원본은 dobee URL을 참조합니다.
 - diff는 **run 시퀀스 기준**입니다: 직전 run에서 pass → 이번 run에서 fail =
   신규 (`status: new`, `since_sha` = 이 run의 pegging). 후보 변경점은
-  `(직전 pegging..since_sha]` 구간의 FTL 커밋들 — pegging=FTL 1:1이라
-  `git log`로 정확히 열거됩니다.
+  `(직전 pegging..since_sha]` 구간의 FTL 커밋들 —
+  `scripts/resolve_ftl.py`가 pegging 커밋의 submodule gitlink에서
+  해석합니다 (integration이 reset돼도 안전).
 - `suspect_sha` / `confidence`(high·medium·unknown)는 **agent 추정 결과**로,
   dobee가 알려주는 사실(status/since/since_sha/로그)과 구분됩니다.
 - **회사 AI 정책: 개발자 아이디는 repo에 기록하지 않습니다.** suspect는 sha로만
