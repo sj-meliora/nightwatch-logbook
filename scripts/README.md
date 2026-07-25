@@ -19,9 +19,15 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 3. run마다: dobee parse-result → ingest_run.py (run_id 오름차순)
    └ stdout: new[] = 이 run에서 유입된 신규 fail (로그 발췌 포함)
              ftl_range = "직전pegging..이번pegging" — 후보 변경점 구간
-4. (LLM) 신규 fail마다 `git log <ftl_range>`로 후보 FTL 커밋 조회 → 매핑
-   → mapping.json 작성. 구간에 커밋이 1개면 사실상 확정(high),
-     구간이 비어 있으면 원인이 FTL 밖 — 매핑하지 말고 unknown으로 남긴다
+4. 신규 fail이 있으면: resolve_ftl.py --repo <integration_ftl> <ftl_range>
+   └ pegging 구간을 submodule gitlink 기준 실제 FTL 커밋 목록으로 변환.
+     integration_ftl이 reset돼도 sha 직접 해석이라 안전하며, 되돌려진
+     커밋은 removed[]로 구분된다 (integration에서 git log를 직접 돌리지
+     말 것 — reset 시 구간이 통째로 사라지거나 ancestry가 끊긴다)
+   (LLM) added[] 커밋 ↔ 신규 fail 매핑 → mapping.json 작성.
+   added가 1개면 사실상 확정(high), 비어 있으면 원인이 FTL 밖 —
+   매핑하지 말고 unknown으로 남긴다 (removed만 있으면 되돌림 자체가
+   원인일 수 있으니 수동 판단)
 5. apply_mapping.py              # 검증 후 추정 필드 기입 (원자적, 실패 시 exit 2)
 6. build_rollup.py               # index.json 재생성
 7. render_reviews.py             # 일간 보고 + 월간 리뷰 렌더링
@@ -60,6 +66,7 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 | `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
 | `status.py` | 조사 대상 구성(investigate) + 구성별 마지막 적재 run 조회 (읽기 전용) |
 | `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
+| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 + reset 전후 진단(`--inspect-reset`) (gitlink 기반, reset 안전, 읽기 전용) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
 | `render_reviews.py` | `reviews/daily/` + `reviews/monthly/` 렌더링 |
