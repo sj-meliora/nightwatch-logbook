@@ -66,7 +66,7 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 | `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
 | `status.py` | 조사 대상 구성(investigate) + 구성별 마지막 적재 run 조회 (읽기 전용) |
 | `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
-| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 (gitlink 기반, reset 안전, 읽기 전용) |
+| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 + reset 전후 진단(`--inspect-reset`) (gitlink 기반, reset 안전, 읽기 전용) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
 | `render_reviews.py` | `reviews/daily/` + `reviews/monthly/` 렌더링 |

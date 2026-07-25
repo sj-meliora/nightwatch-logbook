@@ -15,16 +15,25 @@ FTL sha를 가리킨다. 그런데 integration_ftl은 잘못된 pegging을 정�
    rev-list 차집합**으로 계산한다. 이번 구간에 새로 반영된 커밋(added)과
    reset으로 되돌려진 커밋(removed)이 구분되어 나온다
 
-ingest_run.py stdout의 `ftl_range`("직전pegging..이번pegging")를 그대로
-인자로 넘기는 것이 데일리 흐름의 표준 사용법이다. added가 1개면 사실상
-확정(high), added가 비어 있으면 원인이 FTL 밖이다 (removed만 있으면
-되돌림 자체가 원인일 수 있으니 수동 판단).
+모드 세 가지:
+
+- 단건: `resolve_ftl.py --repo R <sha>` — 그 pegging의 FTL sha만 해석
+- 구간: `resolve_ftl.py --repo R <직전..이번>` — ingest_run.py stdout의
+  `ftl_range`를 그대로 넘기는 데일리 흐름의 표준 사용법. added가 1개면
+  사실상 확정(high), added가 비어 있으면 원인이 FTL 밖이다 (removed만
+  있으면 되돌림 자체가 원인일 수 있으니 수동 판단)
+- reset 진단: `resolve_ftl.py --repo R --inspect-reset` — reset 전후로
+  integration/FTL tip이 각각 무엇이었고 어떻게 바뀌었는지 best effort로
+  재구성한다. reset 이전 tip은 ① 이 clone의 remote-tracking reflog
+  (reset 이전에 fetch한 적이 있어야 함) ② `--old <sha>` 직접 지정
+  (예: 로그북 run 시퀀스의 마지막 pegging) 순으로 찾고, 못 찾으면
+  사유와 다음 시도를 notes로 안내한다
 
 회사 AI 정책에 따라 출력에 author 등 개발자 식별 정보는 싣지 않는다
 (sha·날짜·제목만).
 
-exit code: 0=성공 / 2=인자·해석 오류 (--fetch 등으로 재시도 가능) /
-3=repo 접근 오류
+exit code: 0=성공 (진단 모드에서 '판별 불가'도 성공 — notes 참조) /
+2=인자·해석 오류 (--fetch 등으로 재시도 가능) / 3=repo 접근 오류
 """
 
 import argparse
@@ -106,6 +115,25 @@ def list_commits(repo: Path, spec: str, limit: int) -> tuple[list[dict], int, bo
     return commits, total, False
 
 
+def reflog_shas(repo: Path, ref: str) -> list[str]:
+    """reflog가 거쳐간 sha 목록 (최신순, 중복 제거).
+
+    `reflog show`는 각 entry의 new oid만 보여주므로 old oid는 ref@{n}으로
+    추가 수집한다 — fetch 한 번만 기록된 clone이어도 @{1}이 reset 직전
+    tip을 돌려준다.
+    """
+    rc, out, _ = git(repo, "reflog", "show", "--format=%H", ref)
+    if rc != 0 or not out:
+        return []
+    shas = out.splitlines()
+    for i in range(1, len(shas) + 1):
+        rc, old, _ = git(repo, "rev-parse", "--verify", "--quiet", f"{ref}@{{{i}}}")
+        if rc == 0:
+            shas.append(old)
+    seen: set[str] = set()
+    return [s for s in shas if not (s in seen or seen.add(s))]
+
+
 def pegging_info(integ: Path, rev: str, sha: str, subpath: str) -> tuple[dict | None, str | None]:
     ftl_sha, why = gitlink_at(integ, sha, subpath)
     if ftl_sha is None:
@@ -114,13 +142,172 @@ def pegging_info(integ: Path, rev: str, sha: str, subpath: str) -> tuple[dict | 
             "ftl_sha": ftl_sha, "ftl_short": ftl_sha[:7]}, None
 
 
+def ftl_repo_path(args, integ: Path) -> tuple[Path | None, str | None]:
+    ftl = Path(args.ftl_repo).resolve() if args.ftl_repo else integ / args.submodule
+    if not is_git_repo(ftl):
+        return None, f"FTL repo 아님: {ftl} — submodule 미초기화면 --ftl-repo로 지정"
+    # 미초기화 submodule은 빈 디렉토리라 git -C가 상위(integration) repo로 해석된다
+    if git(ftl, "rev-parse", "--show-toplevel")[1] == git(integ, "rev-parse", "--show-toplevel")[1]:
+        return None, (f"{ftl}는 초기화된 submodule이 아님 — "
+                      "`git submodule update --init` 또는 --ftl-repo로 별도 clone 지정")
+    return ftl, None
+
+
+def ftl_diff(ftl: Path, prev_sha: str, cur_sha: str, fetch: bool,
+             limit: int) -> tuple[dict | None, str | None]:
+    """FTL repo에서 gitlink 전후의 커밋 차집합. 반환 (결과, 오류사유)."""
+    for sha in (prev_sha, cur_sha):
+        if resolve_commit(ftl, sha, fetch) is None:
+            return None, f"FTL repo에 {sha[:7]} 없음 — `git -C {ftl} fetch` 후 재시도"
+    try:
+        added, added_total, added_trunc = list_commits(
+            ftl, f"{prev_sha}..{cur_sha}", limit)
+        removed, removed_total, removed_trunc = list_commits(
+            ftl, f"{cur_sha}..{prev_sha}", limit)
+    except RuntimeError as e:
+        return None, f"FTL 커밋 열거 실패: {e}"
+    return {
+        "ftl_forward": is_ancestor(ftl, prev_sha, cur_sha),
+        "added": added, "added_total": added_total, "added_truncated": added_trunc,
+        "removed": removed, "removed_total": removed_total,
+        "removed_truncated": removed_trunc,
+    }, None
+
+
+# ---------------------------------------------------------------- 모드별 실행
+
+def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
+    ftl, why = ftl_repo_path(args, integ)
+    if ftl is None:
+        return fail(why, 3)
+    diff, why = ftl_diff(ftl, prev["ftl_sha"], cur["ftl_sha"], args.fetch, args.limit)
+    if diff is None:
+        return fail(why, 3 if "열거 실패" in why else 2)
+
+    changed = prev["ftl_sha"] != cur["ftl_sha"]
+    notes = []
+    if not changed:
+        notes.append("FTL gitlink 변동 없음 — 원인이 FTL 밖일 수 있음 (매핑하지 말 것)")
+    if diff["removed_total"]:
+        notes.append("reset 감지 — removed는 이번 구간에서 되돌려진 FTL 커밋. "
+                     "added가 비었으면 되돌림 자체가 원인일 수 있으니 수동 판단")
+
+    return emit({
+        "ok": True,
+        "mode": "range",
+        "submodule": args.submodule,
+        "prev_pegging": prev,
+        "pegging": cur,
+        # False = 두 pegging 사이에 integration_ftl reset/rewrite가 있었음
+        "integration_forward": is_ancestor(integ, prev["sha"], cur["sha"]),
+        "ftl_changed": changed,
+        "ftl_range": f"{prev['ftl_short']}..{cur['ftl_short']}",
+        **diff,
+        "notes": notes,
+    })
+
+
+def run_inspect(args, integ: Path) -> int:
+    # origin/HEAD 같은 symref는 reflog가 없으므로 실제 브랜치명으로 정규화
+    rc, out, _ = git(integ, "rev-parse", "--abbrev-ref", args.branch)
+    branch = out if rc == 0 and out else args.branch
+
+    tip_sha = resolve_commit(integ, branch, False)
+    if tip_sha is None:
+        return fail(f"{branch!r} 해석 불가 — --branch로 추적 브랜치 지정 (예: origin/develop)")
+    tip, why = pegging_info(integ, branch, tip_sha, args.submodule)
+    if tip is None:
+        return fail(why)
+
+    entries = reflog_shas(integ, branch)
+    old_sha = source = None
+    if args.old:
+        old_sha = resolve_commit(integ, args.old, args.fetch)
+        if old_sha is None:
+            return fail(f"--old {args.old!r} 해석 불가 — object가 로컬에도 서버에도 없으면 "
+                        "이 sha 기준 복원은 불가. reset 이전에 fetch한 장기 clone"
+                        "(보존 미러)에서 실행하거나, 로그북 run 시퀀스의 다른 pegging "
+                        "sha로 재시도")
+        source = "--old"
+    else:
+        for sha in entries:
+            if sha == tip_sha or resolve_commit(integ, sha, False) is None:
+                continue  # 현재 tip이거나, reflog에만 남고 object는 gc로 유실
+            if is_ancestor(integ, sha, tip_sha):
+                continue  # 정상 전진 이력 — reset 아님
+            old_sha, source = sha, f"reflog({branch})"
+            break
+
+    if old_sha is None:
+        if len(entries) <= 1:
+            notes = ["reset 이전 tip을 찾지 못함 — 이 clone의 reflog에 이전 fetch "
+                     "기록이 없다 (fresh clone이면 정상, 판별 불가). 다음을 시도: "
+                     "(1) 로그북 run 시퀀스의 마지막 pegging sha를 --old로 지정 "
+                     "(2) reset 이전에 fetch한 장기 clone(보존 미러)에서 실행 "
+                     "(3) 서버가 unreachable sha fetch를 허용하면 --old <full sha> --fetch"]
+        else:
+            notes = [f"reflog {len(entries)}건이 모두 현재 tip의 ancestor — "
+                     "이 clone이 관측한 범위에서는 reset 없음"]
+        return emit({"ok": True, "mode": "reset", "branch": branch,
+                     "submodule": args.submodule, "tip": tip, "old_tip": None,
+                     "reset_detected": False, "notes": notes})
+
+    old, why = pegging_info(integ, source, old_sha, args.submodule)
+    if old is None:
+        return fail(why)
+
+    try:  # integration 전후 — removed가 reset으로 사라진 pegging들이다
+        added_i, added_it, added_itr = list_commits(
+            integ, f"{old_sha}..{tip_sha}", args.limit)
+        removed_i, removed_it, removed_itr = list_commits(
+            integ, f"{tip_sha}..{old_sha}", args.limit)
+    except RuntimeError as e:
+        return fail(f"integration 커밋 열거 실패: {e}", 3)
+    for c in added_i + removed_i:  # 각 커밋이 물고 있던 FTL sha를 함께 표시
+        sha, _ = gitlink_at(integ, c["sha"], args.submodule)
+        c["ftl_short"] = sha[:7] if sha else None
+
+    notes = []
+    if not removed_it:
+        notes.append(f"{source}의 tip이 현재 tip의 ancestor — reset이 아니라 정상 전진 구간")
+
+    ftl_payload = None  # FTL 커밋 목록은 best effort — 없어도 전후 sha는 보여준다
+    ftl, why = ftl_repo_path(args, integ)
+    if ftl is None:
+        notes.append(f"FTL 커밋 목록 생략 — {why}")
+    else:
+        ftl_payload, why = ftl_diff(ftl, old["ftl_sha"], tip["ftl_sha"],
+                                    args.fetch, args.limit)
+        if ftl_payload is None:
+            notes.append(f"FTL 커밋 목록 생략 — {why}")
+
+    return emit({
+        "ok": True,
+        "mode": "reset",
+        "branch": branch,
+        "submodule": args.submodule,
+        "old_tip": {**old, "source": source},   # (1) reset 이전 integration/FTL sha
+        "tip": tip,                             # (2) 현재(이후) integration/FTL sha
+        "reset_detected": bool(removed_it),
+        "integration": {
+            "removed": removed_i, "removed_total": removed_it,
+            "removed_truncated": removed_itr,
+            "added": added_i, "added_total": added_it, "added_truncated": added_itr,
+        },
+        "ftl": ftl_payload and {
+            "before": old["ftl_short"], "after": tip["ftl_short"], **ftl_payload},
+        "notes": notes,
+    })
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="integration pegging sha에서 반영된 FTL 커밋을 해석 (reset 안전).",
         epilog="예: resolve_ftl.py --repo ~/integration_ftl a3f9c21..77d0e4f "
-               "(ingest_run.py stdout의 ftl_range 그대로). "
-               "sha 하나만 주면 그 pegging의 FTL sha만 해석한다.")
-    ap.add_argument("range_or_sha",
+               "(ingest_run.py stdout의 ftl_range 그대로). sha 하나만 주면 그 "
+               "pegging의 FTL sha만 해석한다. --inspect-reset은 reset 전후의 "
+               "integration/FTL tip 변화를 reflog 기반 best effort로 재구성한다.")
+    ap.add_argument("range_or_sha", nargs="?",
                     help="pegging sha 하나 또는 '직전pegging..이번pegging' 구간")
     ap.add_argument("--repo", required=True, help="integration_ftl clone 경로")
     ap.add_argument("--submodule", default="FTL",
@@ -130,13 +317,27 @@ def main() -> int:
     ap.add_argument("--fetch", action="store_true",
                     help="로컬에 없는 sha를 origin에서 fetch 시도 (best effort)")
     ap.add_argument("--limit", type=int, default=100,
-                    help="added/removed 커밋 목록 상한 (0=무제한, 기본 100). "
+                    help="커밋 목록 상한 (0=무제한, 기본 100). "
                          "초과 시 *_truncated=true, *_total은 전체 수")
+    ap.add_argument("--inspect-reset", action="store_true",
+                    help="reset 전후 tip 진단 모드 (구간 인자 대신 사용)")
+    ap.add_argument("--branch", default="origin/HEAD",
+                    help="--inspect-reset가 검사할 추적 브랜치 (기본: origin/HEAD)")
+    ap.add_argument("--old",
+                    help="--inspect-reset에서 reset 이전 tip으로 쓸 sha — reflog에 "
+                         "기록이 없을 때 (예: 로그북 run 시퀀스의 마지막 pegging)")
     args = ap.parse_args()
 
     integ = Path(args.repo).resolve()
     if not is_git_repo(integ):
         return fail(f"integration repo 아님: {integ}", 3)
+
+    if args.inspect_reset:
+        if args.range_or_sha:
+            return fail("--inspect-reset은 구간/sha 인자와 함께 쓸 수 없음")
+        return run_inspect(args, integ)
+    if not args.range_or_sha:
+        return fail("pegging sha 또는 '직전..이번' 구간 필요 (--inspect-reset 아니면 필수)")
 
     if "..." in args.range_or_sha:
         return fail("'...'이 아니라 '..' 구간을 사용 (예: a3f9c21..77d0e4f)")
@@ -167,51 +368,7 @@ def main() -> int:
     prev, why = resolve_pegging(prev_rev)
     if prev is None:
         return fail(why)
-
-    ftl = Path(args.ftl_repo).resolve() if args.ftl_repo else integ / args.submodule
-    if not is_git_repo(ftl):
-        return fail(f"FTL repo 아님: {ftl} — submodule 미초기화면 --ftl-repo로 지정", 3)
-    # 미초기화 submodule은 빈 디렉토리라 git -C가 상위(integration) repo로 해석된다
-    if git(ftl, "rev-parse", "--show-toplevel")[1] == git(integ, "rev-parse", "--show-toplevel")[1]:
-        return fail(f"{ftl}는 초기화된 submodule이 아님 — "
-                    "`git submodule update --init` 또는 --ftl-repo로 별도 clone 지정", 3)
-
-    for sha in (prev["ftl_sha"], cur["ftl_sha"]):
-        if resolve_commit(ftl, sha, args.fetch) is None:
-            return fail(f"FTL repo에 {sha[:7]} 없음 — `git -C {ftl} fetch` 후 재시도")
-
-    changed = prev["ftl_sha"] != cur["ftl_sha"]
-    try:
-        added, added_total, added_trunc = list_commits(
-            ftl, f"{prev['ftl_sha']}..{cur['ftl_sha']}", args.limit)
-        removed, removed_total, removed_trunc = list_commits(
-            ftl, f"{cur['ftl_sha']}..{prev['ftl_sha']}", args.limit)
-    except RuntimeError as e:
-        return fail(f"FTL 커밋 열거 실패: {e}", 3)
-
-    notes = []
-    if not changed:
-        notes.append("FTL gitlink 변동 없음 — 원인이 FTL 밖일 수 있음 (매핑하지 말 것)")
-    if removed_total:
-        notes.append("reset 감지 — removed는 이번 구간에서 되돌려진 FTL 커밋. "
-                     "added가 비었으면 되돌림 자체가 원인일 수 있으니 수동 판단")
-
-    return emit({
-        "ok": True,
-        "mode": "range",
-        "submodule": args.submodule,
-        "prev_pegging": prev,
-        "pegging": cur,
-        # False = 두 pegging 사이에 integration_ftl reset/rewrite가 있었음
-        "integration_forward": is_ancestor(integ, prev["sha"], cur["sha"]),
-        "ftl_changed": changed,
-        "ftl_forward": is_ancestor(ftl, prev["ftl_sha"], cur["ftl_sha"]),
-        "ftl_range": f"{prev['ftl_short']}..{cur['ftl_short']}",
-        "added": added, "added_total": added_total, "added_truncated": added_trunc,
-        "removed": removed, "removed_total": removed_total,
-        "removed_truncated": removed_trunc,
-        "notes": notes,
-    })
+    return run_range(args, integ, prev, cur)
 
 
 if __name__ == "__main__":
