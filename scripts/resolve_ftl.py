@@ -27,7 +27,8 @@ FTL sha를 가리킨다. 그런데 integration_ftl은 잘못된 pegging을 정�
   재구성한다. reset 이전 tip은 ① 이 clone의 remote-tracking reflog
   (reset 이전에 fetch한 적이 있어야 함) ② `--old <sha>` 직접 지정
   (예: 로그북 run 시퀀스의 마지막 pegging) 순으로 찾고, 못 찾으면
-  사유와 다음 시도를 notes로 안내한다
+  reset_status=unknown과 다음 시도를 notes로 안내한다. reset_status는
+  detected/not_detected/unknown 세 값이며 unknown일 때 reset_detected는 null이다
 
 회사 AI 정책에 따라 출력에 author 등 개발자 식별 정보는 싣지 않는다
 (sha·날짜·제목만).
@@ -134,6 +135,13 @@ def reflog_shas(repo: Path, ref: str) -> list[str]:
     return [s for s in shas if not (s in seen or seen.add(s))]
 
 
+def tracking_branch(repo: Path, branch: str) -> str:
+    """origin/HEAD 같은 remote symref를 실제 추적 브랜치명으로 변환한다."""
+    ref = branch if branch.startswith("refs/") else f"refs/remotes/{branch}"
+    rc, out, _ = git(repo, "symbolic-ref", "--quiet", "--short", ref)
+    return out if rc == 0 and out else branch
+
+
 def pegging_info(integ: Path, rev: str, sha: str, subpath: str) -> tuple[dict | None, str | None]:
     ftl_sha, why = gitlink_at(integ, sha, subpath)
     if ftl_sha is None:
@@ -189,8 +197,9 @@ def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
     if not changed:
         notes.append("FTL gitlink 변동 없음 — 원인이 FTL 밖일 수 있음 (매핑하지 말 것)")
     if diff["removed_total"]:
-        notes.append("reset 감지 — removed는 이번 구간에서 되돌려진 FTL 커밋. "
-                     "added가 비었으면 되돌림 자체가 원인일 수 있으니 수동 판단")
+        notes.append("FTL gitlink 간 비전진 변경 감지 — removed는 현재 tip에서 "
+                     "도달할 수 없어진 커밋. reset·rebase·branch 전환 여부는 별도 "
+                     "판단하고, added가 비었으면 되돌림 자체도 원인 후보로 검토")
 
     return emit({
         "ok": True,
@@ -208,9 +217,8 @@ def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
 
 
 def run_inspect(args, integ: Path) -> int:
-    # origin/HEAD 같은 symref는 reflog가 없으므로 실제 브랜치명으로 정규화
-    rc, out, _ = git(integ, "rev-parse", "--abbrev-ref", args.branch)
-    branch = out if rc == 0 and out else args.branch
+    # origin/HEAD 같은 symref는 자체 reflog가 없으므로 실제 추적 브랜치로 변환
+    branch = tracking_branch(integ, args.branch)
 
     tip_sha = resolve_commit(integ, branch, False)
     if tip_sha is None:
@@ -248,9 +256,12 @@ def run_inspect(args, integ: Path) -> int:
         else:
             notes = [f"reflog {len(entries)}건이 모두 현재 tip의 ancestor — "
                      "이 clone이 관측한 범위에서는 reset 없음"]
+        status = "unknown" if len(entries) <= 1 else "not_detected"
         return emit({"ok": True, "mode": "reset", "branch": branch,
                      "submodule": args.submodule, "tip": tip, "old_tip": None,
-                     "reset_detected": False, "notes": notes})
+                     "reset_status": status,
+                     "reset_detected": None if status == "unknown" else False,
+                     "notes": notes})
 
     old, why = pegging_info(integ, source, old_sha, args.submodule)
     if old is None:
@@ -288,6 +299,7 @@ def run_inspect(args, integ: Path) -> int:
         "submodule": args.submodule,
         "old_tip": {**old, "source": source},   # (1) reset 이전 integration/FTL sha
         "tip": tip,                             # (2) 현재(이후) integration/FTL sha
+        "reset_status": "detected" if removed_it else "not_detected",
         "reset_detected": bool(removed_it),
         "integration": {
             "removed": removed_i, "removed_total": removed_it,
