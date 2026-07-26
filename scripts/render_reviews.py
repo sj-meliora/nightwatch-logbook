@@ -30,7 +30,8 @@ def main() -> int:
     try:
         manifest = logbook.load_manifest(root)
     except FileNotFoundError:
-        print(json.dumps({"ok": False, "error": "results/configs.json 없음"},
+        print(json.dumps({"ok": False, "error_code": "MANIFEST_NOT_FOUND",
+                          "error": "results/configs.json 없음"},
                          ensure_ascii=False))
         return 3
 
@@ -50,7 +51,8 @@ def main() -> int:
                          encoding="utf-8")
             wrote.append(str(p.relative_to(root)))
     except ValueError as e:
-        print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+        print(json.dumps({"ok": False, "error_code": "REVIEW_VALIDATION_FAILED",
+                          "error": str(e)}, ensure_ascii=False))
         return 2
 
     json.dump({"schema_version": logbook.SCHEMA_VERSION, "ok": True, "wrote": wrote},

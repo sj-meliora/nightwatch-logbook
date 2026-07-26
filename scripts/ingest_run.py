@@ -26,8 +26,10 @@ def emit(payload: dict, code: int = 0) -> int:
     return code
 
 
-def fail(msg: str, code: int = 2) -> int:
-    return emit({"ok": False, "error": msg}, code)
+def fail(msg: str, code: int = 2, error_code: str | None = None) -> int:
+    return emit({"ok": False,
+                 "error_code": error_code or ("IO_ERROR" if code == 3 else "INVALID_INPUT"),
+                 "error": msg}, code)
 
 
 def main() -> int:

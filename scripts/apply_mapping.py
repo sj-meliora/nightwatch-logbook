@@ -50,9 +50,11 @@ def main() -> int:
     try:
         entries = logbook.load_json(Path(args.mapping))
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        return emit({"ok": False, "error": f"mapping 파일 오류: {e}"}, 3)
+        return emit({"ok": False, "error_code": "MAPPING_FILE_ERROR",
+                     "error": f"mapping 파일 오류: {e}"}, 3)
     if not isinstance(entries, list):
-        return emit({"ok": False, "error": "mapping.json은 항목 배열이어야 함"}, 2)
+        return emit({"ok": False, "error_code": "INVALID_MAPPING",
+                     "error": "mapping.json은 항목 배열이어야 함"}, 2)
 
     # 1단계: 전 항목 검증 (원자적 적용을 위해 쓰기 전에 모두 확인)
     errors: list[str] = []
@@ -69,7 +71,8 @@ def main() -> int:
         if problem:
             errors.append(f"[{i}] {cid}: {problem}")
     if errors:
-        return emit({"ok": False, "errors": errors,
+        return emit({"ok": False, "error_code": "MAPPING_VALIDATION_FAILED",
+                     "errors": errors,
                      "hint": "당일 신규(since==당일) TC만 매핑 대상. "
                              "ingest 출력의 new 배열 참조"}, 2)
 
