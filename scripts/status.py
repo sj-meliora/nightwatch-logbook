@@ -37,14 +37,16 @@ def main() -> int:
     args = ap.parse_args()
 
     if not logbook.DATE_RE.match(args.date):
-        print(json.dumps({"ok": False, "error": f"날짜 형식 오류: {args.date}"},
+        print(json.dumps({"ok": False, "error_code": "INVALID_DATE",
+                          "error": f"날짜 형식 오류: {args.date}"},
                          ensure_ascii=False))
         return 2
     root = Path(args.root).resolve()
     try:
         manifest = logbook.load_manifest(root)
     except FileNotFoundError:
-        print(json.dumps({"ok": False, "error": "results/configs.json 없음 — --root 확인"},
+        print(json.dumps({"ok": False, "error_code": "MANIFEST_NOT_FOUND",
+                          "error": "results/configs.json 없음 — --root 확인"},
                          ensure_ascii=False))
         return 3
 

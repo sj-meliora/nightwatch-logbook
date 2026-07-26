@@ -38,6 +38,7 @@ exit code: 0=성공 (진단 모드에서 '판별 불가'도 성공 — notes 참
 """
 
 import argparse
+from dataclasses import dataclass
 import json
 import subprocess
 import sys
@@ -54,8 +55,40 @@ def emit(payload: dict, code: int = 0) -> int:
     return code
 
 
-def fail(msg: str, code: int = 2) -> int:
-    return emit({"ok": False, "error": msg}, code)
+def fail(error_code: str, msg: str, code: int = 2, **extra: object) -> int:
+    return emit({"ok": False, "error_code": error_code, "error": msg, **extra}, code)
+
+
+@dataclass
+class FetchReport:
+    """`--fetch`의 실제 수행 여부와 결과를 stdout용으로 누적한다."""
+
+    requested: bool
+    attempted: bool = False
+    status: str = "not_requested"
+
+    def __post_init__(self) -> None:
+        if self.requested:
+            self.status = "not_needed"
+
+    def record(self, succeeded: bool) -> None:
+        self.attempted = True
+        # 여러 sha 중 하나라도 실패하면 전체 best-effort fetch는 실패로 표시한다.
+        if not succeeded or self.status == "failed":
+            self.status = "failed"
+        else:
+            self.status = "succeeded"
+
+    def payload(self) -> dict:
+        return {"requested": self.requested, "attempted": self.attempted,
+                "status": self.status}
+
+
+@dataclass(frozen=True)
+class ResolutionError:
+    error_code: str
+    message: str
+    exit_code: int
 
 
 def git(repo: Path, *args: str) -> tuple[int, str, str]:
@@ -68,25 +101,27 @@ def is_git_repo(repo: Path) -> bool:
     return git(repo, "rev-parse", "--git-dir")[0] == 0
 
 
-def resolve_commit(repo: Path, rev: str, fetch: bool) -> str | None:
+def resolve_commit(repo: Path, rev: str, fetch: FetchReport) -> str | None:
     """rev → 전체 commit sha. unreachable이어도 object만 있으면 된다."""
     rc, out, _ = git(repo, "rev-parse", "--verify", "--quiet", rev + "^{commit}")
     if rc == 0:
         return out
-    if fetch:
+    if fetch.requested:
         # reset으로 사라진 sha는 서버 설정에 따라 fetch가 거부될 수 있다 — best effort
-        git(repo, "fetch", "--quiet", "origin", rev)
+        fetch_rc, _, _ = git(repo, "fetch", "--quiet", "origin", rev)
         rc, out, _ = git(repo, "rev-parse", "--verify", "--quiet", rev + "^{commit}")
-        if rc == 0:
+        succeeded = fetch_rc == 0 and rc == 0
+        fetch.record(succeeded)
+        if succeeded:
             return out
     return None
 
 
 def gitlink_at(repo: Path, commit: str, subpath: str) -> tuple[str | None, str | None]:
     """commit 트리의 submodule gitlink sha. 반환 (sha, 오류사유)."""
-    rc, out, err = git(repo, "ls-tree", commit, "--", subpath)
+    rc, out, _ = git(repo, "ls-tree", commit, "--", subpath)
     if rc != 0:
-        return None, err or f"ls-tree 실패: {commit[:7]}"
+        return None, f"ls-tree 실패: {commit[:7]}"
     if not out:
         return None, f"pegging {commit[:7]} 트리에 {subpath!r} 경로 없음 — --submodule 확인"
     mode, otype, sha = out.split(None, 3)[:3]
@@ -104,7 +139,9 @@ def list_commits(repo: Path, spec: str, limit: int) -> tuple[list[dict], int, bo
     """spec('A..B') 차집합의 커밋 목록 (신규순). 반환 (목록, 전체 수, 절단 여부)."""
     rc, out, err = git(repo, "log", "--format=%H%x1f%cs%x1f%s", spec)
     if rc != 0:
-        raise RuntimeError(err)
+        # git stderr에는 remote URL, credential helper 출력 등 비공개 정보가
+        # 섞일 수 있으므로 호출자에게 전달하지 않는다.
+        raise RuntimeError("git log failed")
     commits = []
     for line in out.splitlines():
         sha, date, subject = line.split("\x1f", 2)
@@ -153,27 +190,30 @@ def pegging_info(integ: Path, rev: str, sha: str, subpath: str) -> tuple[dict | 
 def ftl_repo_path(args, integ: Path) -> tuple[Path | None, str | None]:
     ftl = Path(args.ftl_repo).resolve() if args.ftl_repo else integ / args.submodule
     if not is_git_repo(ftl):
-        return None, f"FTL repo 아님: {ftl} — submodule 미초기화면 --ftl-repo로 지정"
+        return None, "FTL repo 아님 — submodule 미초기화면 --ftl-repo로 지정"
     # 미초기화 submodule은 빈 디렉토리라 git -C가 상위(integration) repo로 해석된다
     if git(ftl, "rev-parse", "--show-toplevel")[1] == git(integ, "rev-parse", "--show-toplevel")[1]:
-        return None, (f"{ftl}는 초기화된 submodule이 아님 — "
+        return None, ("기본 FTL 경로는 초기화된 submodule이 아님 — "
                       "`git submodule update --init` 또는 --ftl-repo로 별도 clone 지정")
     return ftl, None
 
 
-def ftl_diff(ftl: Path, prev_sha: str, cur_sha: str, fetch: bool,
-             limit: int) -> tuple[dict | None, str | None]:
+def ftl_diff(ftl: Path, prev_sha: str, cur_sha: str, fetch: FetchReport,
+             limit: int) -> tuple[dict | None, ResolutionError | None]:
     """FTL repo에서 gitlink 전후의 커밋 차집합. 반환 (결과, 오류사유)."""
     for sha in (prev_sha, cur_sha):
         if resolve_commit(ftl, sha, fetch) is None:
-            return None, f"FTL repo에 {sha[:7]} 없음 — `git -C {ftl} fetch` 후 재시도"
+            return None, ResolutionError(
+                "FTL_REVISION_NOT_FOUND",
+                f"FTL repo에 {sha[:7]} 없음 — --fetch로 재시도", 2)
     try:
         added, added_total, added_trunc = list_commits(
             ftl, f"{prev_sha}..{cur_sha}", limit)
         removed, removed_total, removed_trunc = list_commits(
             ftl, f"{cur_sha}..{prev_sha}", limit)
-    except RuntimeError as e:
-        return None, f"FTL 커밋 열거 실패: {e}"
+    except RuntimeError:
+        return None, ResolutionError(
+            "FTL_HISTORY_READ_FAILED", "FTL 커밋 열거 실패", 3)
     return {
         "ftl_forward": is_ancestor(ftl, prev_sha, cur_sha),
         "added": added, "added_total": added_total, "added_truncated": added_trunc,
@@ -187,10 +227,13 @@ def ftl_diff(ftl: Path, prev_sha: str, cur_sha: str, fetch: bool,
 def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
     ftl, why = ftl_repo_path(args, integ)
     if ftl is None:
-        return fail(why, 3)
-    diff, why = ftl_diff(ftl, prev["ftl_sha"], cur["ftl_sha"], args.fetch, args.limit)
+        return fail("FTL_REPOSITORY_INVALID", why, 3,
+                    fetch=args.fetch_report.payload())
+    diff, problem = ftl_diff(ftl, prev["ftl_sha"], cur["ftl_sha"],
+                             args.fetch_report, args.limit)
     if diff is None:
-        return fail(why, 3 if "열거 실패" in why else 2)
+        return fail(problem.error_code, problem.message, problem.exit_code,
+                    fetch=args.fetch_report.payload())
 
     changed = prev["ftl_sha"] != cur["ftl_sha"]
     notes = []
@@ -213,6 +256,7 @@ def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
         "ftl_range": f"{prev['ftl_short']}..{cur['ftl_short']}",
         **diff,
         "notes": notes,
+        "fetch": args.fetch_report.payload(),
     })
 
 
@@ -220,26 +264,29 @@ def run_inspect(args, integ: Path) -> int:
     # origin/HEAD 같은 symref는 자체 reflog가 없으므로 실제 추적 브랜치로 변환
     branch = tracking_branch(integ, args.branch)
 
-    tip_sha = resolve_commit(integ, branch, False)
+    tip_sha = resolve_commit(integ, branch, FetchReport(False))
     if tip_sha is None:
-        return fail(f"{branch!r} 해석 불가 — --branch로 추적 브랜치 지정 (예: origin/develop)")
+        return fail("BRANCH_NOT_FOUND",
+                    f"{branch!r} 해석 불가 — --branch로 추적 브랜치 지정 (예: origin/develop)",
+                    fetch=args.fetch_report.payload())
     tip, why = pegging_info(integ, branch, tip_sha, args.submodule)
     if tip is None:
-        return fail(why)
+        return fail("GITLINK_READ_FAILED", why, fetch=args.fetch_report.payload())
 
     entries = reflog_shas(integ, branch)
     old_sha = source = None
     if args.old:
-        old_sha = resolve_commit(integ, args.old, args.fetch)
+        old_sha = resolve_commit(integ, args.old, args.fetch_report)
         if old_sha is None:
-            return fail(f"--old {args.old!r} 해석 불가 — object가 로컬에도 서버에도 없으면 "
+            return fail("PEGGING_REVISION_NOT_FOUND",
+                        f"--old {args.old!r} 해석 불가 — object가 로컬에도 서버에도 없으면 "
                         "이 sha 기준 복원은 불가. reset 이전에 fetch한 장기 clone"
                         "(보존 미러)에서 실행하거나, 로그북 run 시퀀스의 다른 pegging "
-                        "sha로 재시도")
+                        "sha로 재시도", fetch=args.fetch_report.payload())
         source = "--old"
     else:
         for sha in entries:
-            if sha == tip_sha or resolve_commit(integ, sha, False) is None:
+            if sha == tip_sha or resolve_commit(integ, sha, FetchReport(False)) is None:
                 continue  # 현재 tip이거나, reflog에만 남고 object는 gc로 유실
             if is_ancestor(integ, sha, tip_sha):
                 continue  # 정상 전진 이력 — reset 아님
@@ -261,19 +308,22 @@ def run_inspect(args, integ: Path) -> int:
                      "submodule": args.submodule, "tip": tip, "old_tip": None,
                      "reset_status": status,
                      "reset_detected": None if status == "unknown" else False,
+                     "fetch": args.fetch_report.payload(),
                      "notes": notes})
 
     old, why = pegging_info(integ, source, old_sha, args.submodule)
     if old is None:
-        return fail(why)
+        return fail("GITLINK_READ_FAILED", why, fetch=args.fetch_report.payload())
 
     try:  # integration 전후 — removed가 reset으로 사라진 pegging들이다
         added_i, added_it, added_itr = list_commits(
             integ, f"{old_sha}..{tip_sha}", args.limit)
         removed_i, removed_it, removed_itr = list_commits(
             integ, f"{tip_sha}..{old_sha}", args.limit)
-    except RuntimeError as e:
-        return fail(f"integration 커밋 열거 실패: {e}", 3)
+    except RuntimeError:
+        return fail("INTEGRATION_HISTORY_READ_FAILED",
+                    "integration 커밋 열거 실패", 3,
+                    fetch=args.fetch_report.payload())
     for c in added_i + removed_i:  # 각 커밋이 물고 있던 FTL sha를 함께 표시
         sha, _ = gitlink_at(integ, c["sha"], args.submodule)
         c["ftl_short"] = sha[:7] if sha else None
@@ -288,9 +338,9 @@ def run_inspect(args, integ: Path) -> int:
         notes.append(f"FTL 커밋 목록 생략 — {why}")
     else:
         ftl_payload, why = ftl_diff(ftl, old["ftl_sha"], tip["ftl_sha"],
-                                    args.fetch, args.limit)
+                                    args.fetch_report, args.limit)
         if ftl_payload is None:
-            notes.append(f"FTL 커밋 목록 생략 — {why}")
+            notes.append(f"FTL 커밋 목록 생략 — {why.message}")
 
     return emit({
         "ok": True,
@@ -308,6 +358,7 @@ def run_inspect(args, integ: Path) -> int:
         },
         "ftl": ftl_payload and {
             "before": old["ftl_short"], "after": tip["ftl_short"], **ftl_payload},
+        "fetch": args.fetch_report.payload(),
         "notes": notes,
     })
 
@@ -339,29 +390,39 @@ def main() -> int:
                     help="--inspect-reset에서 reset 이전 tip으로 쓸 sha — reflog에 "
                          "기록이 없을 때 (예: 로그북 run 시퀀스의 마지막 pegging)")
     args = ap.parse_args()
+    args.fetch_report = FetchReport(args.fetch)
 
     integ = Path(args.repo).resolve()
     if not is_git_repo(integ):
-        return fail(f"integration repo 아님: {integ}", 3)
+        return fail("INTEGRATION_REPOSITORY_INVALID", "integration repo 아님", 3,
+                    fetch=args.fetch_report.payload())
 
     if args.inspect_reset:
         if args.range_or_sha:
-            return fail("--inspect-reset은 구간/sha 인자와 함께 쓸 수 없음")
+            return fail("INVALID_ARGUMENT",
+                        "--inspect-reset은 구간/sha 인자와 함께 쓸 수 없음",
+                        fetch=args.fetch_report.payload())
         return run_inspect(args, integ)
     if not args.range_or_sha:
-        return fail("pegging sha 또는 '직전..이번' 구간 필요 (--inspect-reset 아니면 필수)")
+        return fail("INVALID_ARGUMENT",
+                    "pegging sha 또는 '직전..이번' 구간 필요 (--inspect-reset 아니면 필수)",
+                    fetch=args.fetch_report.payload())
 
     if "..." in args.range_or_sha:
-        return fail("'...'이 아니라 '..' 구간을 사용 (예: a3f9c21..77d0e4f)")
+        return fail("INVALID_RANGE",
+                    "'...'이 아니라 '..' 구간을 사용 (예: a3f9c21..77d0e4f)",
+                    fetch=args.fetch_report.payload())
     if ".." in args.range_or_sha:
         prev_rev, _, cur_rev = args.range_or_sha.partition("..")
         if not prev_rev or not cur_rev:
-            return fail(f"구간 형식 오류: {args.range_or_sha!r} (양쪽 sha 필요)")
+            return fail("INVALID_RANGE",
+                        f"구간 형식 오류: {args.range_or_sha!r} (양쪽 sha 필요)",
+                        fetch=args.fetch_report.payload())
     else:
         prev_rev, cur_rev = None, args.range_or_sha
 
     def resolve_pegging(rev: str) -> tuple[dict | None, str | None]:
-        sha = resolve_commit(integ, rev, args.fetch)
+        sha = resolve_commit(integ, rev, args.fetch_report)
         if sha is None:
             return None, (f"pegging {rev!r}를 integration repo에서 해석 불가 — "
                           "reset으로 unreachable해도 object가 남아 있으면 해석된다. "
@@ -371,15 +432,17 @@ def main() -> int:
 
     cur, why = resolve_pegging(cur_rev)
     if cur is None:
-        return fail(why)
+        return fail("PEGGING_REVISION_NOT_FOUND", why,
+                    fetch=args.fetch_report.payload())
 
     if prev_rev is None:  # 단건 해석 — FTL repo 불필요
         return emit({"ok": True, "mode": "single", "submodule": args.submodule,
-                     "pegging": cur})
+                     "pegging": cur, "fetch": args.fetch_report.payload()})
 
     prev, why = resolve_pegging(prev_rev)
     if prev is None:
-        return fail(why)
+        return fail("PEGGING_REVISION_NOT_FOUND", why,
+                    fetch=args.fetch_report.payload())
     return run_range(args, integ, prev, cur)
 
 

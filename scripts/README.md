@@ -38,6 +38,27 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 각 스크립트의 인자는 `--help`로 확인한다 (스킬 문서에 사용법을 중복 기술하지
 않는다). 공통 계약: **stdout은 JSON 한 덩어리** (`schema_version` 포함),
 exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / `3`=IO 오류.
+실패 JSON에는 사람이 읽는 `error`와 함께 기계 판정용 `error_code`가 항상
+포함된다. 호출자는 오류 문구를 비교해 exit code나 재시도 여부를 판정하지 말고
+프로세스 exit code와 `error_code`를 사용한다.
+
+`resolve_ftl.py --fetch` 결과에는 다음 진단 객체가 성공·실패 모두 포함된다.
+
+```json
+"fetch": {
+  "requested": true,
+  "attempted": true,
+  "status": "succeeded"
+}
+```
+
+- `requested`: 호출자가 `--fetch`를 지정했는지
+- `attempted`: 로컬 object가 없어 실제 fetch를 실행했는지
+- `status`: `not_requested` | `not_needed` | `succeeded` | `failed`
+
+stdout JSON에는 remote URL, repo 경로 및 git stderr를 싣지 않는다. 운영 로그나
+LLM 입력으로 credential·내부 주소가 유출되지 않도록 호출측에서도 stderr를
+사용자에게 그대로 전달하지 않는다.
 
 ## mapping.json — LLM이 작성하는 유일한 파일
 

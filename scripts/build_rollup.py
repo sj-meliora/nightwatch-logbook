@@ -25,14 +25,16 @@ def main() -> int:
     try:
         manifest = logbook.load_manifest(root)
     except FileNotFoundError:
-        print(json.dumps({"ok": False, "error": "results/configs.json 없음"},
+        print(json.dumps({"ok": False, "error_code": "MANIFEST_NOT_FOUND",
+                          "error": "results/configs.json 없음"},
                          ensure_ascii=False))
         return 3
 
     targets = [m for m in manifest["configs"]
                if args.config is None or m["id"] == args.config]
     if not targets:
-        print(json.dumps({"ok": False, "error": f"구성 없음: {args.config}"},
+        print(json.dumps({"ok": False, "error_code": "CONFIG_NOT_FOUND",
+                          "error": f"구성 없음: {args.config}"},
                          ensure_ascii=False))
         return 2
     for meta in targets:

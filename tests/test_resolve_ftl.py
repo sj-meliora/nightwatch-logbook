@@ -119,7 +119,57 @@ class ResolveFtlTests(unittest.TestCase):
         proc, payload = self.fixture.run(f"{self.fixture.p2}..HEAD")
         self.assertEqual(proc.returncode, 2)
         self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error_code"], "PEGGING_REVISION_NOT_FOUND")
         self.assertIn("해석 불가", payload["error"])
+
+    def test_fetch_success_reports_requested_attempted_and_status(self) -> None:
+        remote = self.fixture.root / "integration-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        git(self.fixture.integration, "remote", "add", "origin", str(remote))
+        p3 = self.fixture.pegging(self.fixture.f2, "remote-only pegging")
+        git(self.fixture.integration, "push", "-q", "origin", "HEAD:main")
+        git(self.fixture.integration, "reset", "--hard", "-q", self.fixture.p2)
+        git(self.fixture.integration, "update-ref", "-d", "refs/remotes/origin/main")
+        git(self.fixture.integration, "reflog", "expire", "--expire=now", "--all")
+        git(self.fixture.integration, "gc", "--prune=now", "--quiet")
+
+        proc, payload = self.fixture.run("--fetch", p3)
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(payload["pegging"]["sha"], p3)
+        self.assertEqual(payload["fetch"], {
+            "requested": True, "attempted": True, "status": "succeeded"
+        })
+
+    def test_fetch_failure_is_structured_and_hides_remote_and_git_stderr(self) -> None:
+        secret_remote = str(self.fixture.root / "SECRET_REMOTE_URL")
+        git(self.fixture.integration, "remote", "add", "origin", secret_remote)
+
+        proc, payload = self.fixture.run("--fetch", "deadbeefdeadbeef")
+
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(payload["error_code"], "PEGGING_REVISION_NOT_FOUND")
+        self.assertEqual(payload["fetch"], {
+            "requested": True, "attempted": True, "status": "failed"
+        })
+        self.assertNotIn(secret_remote, proc.stdout)
+        self.assertNotIn("fatal:", proc.stdout)
+
+    def test_invalid_repo_error_is_structured_and_hides_repo_path(self) -> None:
+        missing = self.fixture.root / "SECRET_REPO_PATH"
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--repo", str(missing), "--fetch", "HEAD"],
+            capture_output=True, text=True,
+        )
+        payload = json.loads(proc.stdout)
+
+        self.assertEqual(proc.returncode, 3)
+        self.assertEqual(payload["error_code"], "INTEGRATION_REPOSITORY_INVALID")
+        self.assertEqual(payload["fetch"], {
+            "requested": True, "attempted": False, "status": "not_needed"
+        })
+        self.assertNotIn(str(missing), proc.stdout)
+        self.assertNotIn("fatal:", proc.stdout)
 
     def test_inspect_reset_resolves_origin_head_and_detects_rewrite(self) -> None:
         git(self.fixture.integration, "config", "core.logAllRefUpdates", "always")
@@ -171,6 +221,7 @@ class ResolveFtlTests(unittest.TestCase):
         payload = json.loads(proc.stdout)
         self.assertEqual(proc.returncode, 3)
         self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error_code"], "FTL_REPOSITORY_INVALID")
         self.assertIn("submodule", payload["error"])
 
     def test_limit_reports_total_and_truncation(self) -> None:
