@@ -38,6 +38,33 @@ class ScriptErrorContractTests(unittest.TestCase):
                     self.assertIsInstance(payload["error_code"], str)
                     self.assertTrue(payload["error_code"])
 
+    def test_argparse_failures_use_json_error_contract(self) -> None:
+        for script in ("status.py", "build_rollup.py", "render_reviews.py",
+                       "ingest_run.py", "apply_mapping.py", "resolve_ftl.py"):
+            with self.subTest(script=script):
+                proc, payload = self.run_script(script, "--unknown-secret-option")
+                self.assertEqual(proc.returncode, 2)
+                self.assertEqual(payload["error_code"], "ARGUMENT_PARSING_FAILED")
+                self.assertIn("error", payload)
+                self.assertNotIn("unknown-secret-option", proc.stdout)
+
+    def test_mapping_validation_has_summary_and_detail_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            mapping = root / "mapping.json"
+            mapping.write_text(json.dumps([{
+                "config": "unknown-config", "tc": "TC_X",
+                "suspect_sha": "abcdef0", "confidence": "high",
+            }]), encoding="utf-8")
+            proc, payload = self.run_script(
+                "apply_mapping.py", "--root", str(ROOT), "--date", "2026-07-26",
+                "--mapping", str(mapping),
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertEqual(payload["error_code"], "MAPPING_VALIDATION_FAILED")
+            self.assertIn("error", payload)
+            self.assertTrue(payload["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

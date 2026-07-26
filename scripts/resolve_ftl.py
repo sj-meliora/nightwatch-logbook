@@ -37,7 +37,6 @@ exit code: 0=성공 (진단 모드에서 '판별 불가'도 성공 — notes 참
 2=인자·해석 오류 (--fetch 등으로 재시도 가능) / 3=repo 접근 오류
 """
 
-import argparse
 from dataclasses import dataclass
 import json
 import subprocess
@@ -66,18 +65,27 @@ class FetchReport:
     requested: bool
     attempted: bool = False
     status: str = "not_requested"
+    attempts: int = 0
+    successes: int = 0
 
     def __post_init__(self) -> None:
         if self.requested:
+            self.status = "skipped"
+
+    def found_locally(self) -> None:
+        if self.requested and not self.attempted:
             self.status = "not_needed"
 
     def record(self, succeeded: bool) -> None:
         self.attempted = True
-        # 여러 sha 중 하나라도 실패하면 전체 best-effort fetch는 실패로 표시한다.
-        if not succeeded or self.status == "failed":
+        self.attempts += 1
+        self.successes += int(succeeded)
+        if self.successes == self.attempts:
+            self.status = "succeeded"
+        elif self.successes == 0:
             self.status = "failed"
         else:
-            self.status = "succeeded"
+            self.status = "partially_succeeded"
 
     def payload(self) -> dict:
         return {"requested": self.requested, "attempted": self.attempted,
@@ -105,6 +113,7 @@ def resolve_commit(repo: Path, rev: str, fetch: FetchReport) -> str | None:
     """rev → 전체 commit sha. unreachable이어도 object만 있으면 된다."""
     rc, out, _ = git(repo, "rev-parse", "--verify", "--quiet", rev + "^{commit}")
     if rc == 0:
+        fetch.found_locally()
         return out
     if fetch.requested:
         # reset으로 사라진 sha는 서버 설정에 따라 fetch가 거부될 수 있다 — best effort
@@ -364,7 +373,7 @@ def run_inspect(args, integ: Path) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
+    ap = logbook.JsonArgumentParser(
         description="integration pegging sha에서 반영된 FTL 커밋을 해석 (reset 안전).",
         epilog="예: resolve_ftl.py --repo ~/integration_ftl a3f9c21..77d0e4f "
                "(ingest_run.py stdout의 ftl_range 그대로). sha 하나만 주면 그 "

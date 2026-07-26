@@ -18,7 +18,6 @@ runs/ 파일명이나 configs.json을 직접 파싱하지 말고 이 출력을 �
 exit code: 0=성공 / 2=인자 오류 / 3=IO 오류
 """
 
-import argparse
 import datetime
 import json
 import sys
@@ -29,7 +28,7 @@ import logbook
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
+    ap = logbook.JsonArgumentParser(
         description="조사 대상 구성과 구성별 마지막 적재 run 조회.")
     ap.add_argument("--root", default=".", help="nightwatch-logbook repo 루트 (기본: cwd)")
     ap.add_argument("--date", default=datetime.date.today().isoformat(),
