@@ -21,7 +21,6 @@ errors 배열 — 호출측 LLM이 읽고 재시도한다.
 exit code: 0=성공 / 2=인자·검증 오류 / 3=IO 오류
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -38,7 +37,7 @@ def emit(payload: dict, code: int = 0) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
+    ap = logbook.JsonArgumentParser(
         description="mapping.json의 suspect_sha/confidence/rationale을 "
                     "해당 일자 run JSON들의 신규 fail 항목에 기입.")
     ap.add_argument("--date", required=True, help="대상 일자 YYYY-MM-DD")
@@ -72,6 +71,7 @@ def main() -> int:
             errors.append(f"[{i}] {cid}: {problem}")
     if errors:
         return emit({"ok": False, "error_code": "MAPPING_VALIDATION_FAILED",
+                     "error": "mapping 검증 실패",
                      "errors": errors,
                      "hint": "당일 신규(since==당일) TC만 매핑 대상. "
                              "ingest 출력의 new 배열 참조"}, 2)

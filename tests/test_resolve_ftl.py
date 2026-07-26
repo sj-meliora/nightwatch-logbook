@@ -166,10 +166,31 @@ class ResolveFtlTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 3)
         self.assertEqual(payload["error_code"], "INTEGRATION_REPOSITORY_INVALID")
         self.assertEqual(payload["fetch"], {
-            "requested": True, "attempted": False, "status": "not_needed"
+            "requested": True, "attempted": False, "status": "skipped"
         })
         self.assertNotIn(str(missing), proc.stdout)
         self.assertNotIn("fatal:", proc.stdout)
+
+    def test_fetch_mixed_results_are_reported_as_partial(self) -> None:
+        remote = self.fixture.root / "integration-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        git(self.fixture.integration, "remote", "add", "origin", str(remote))
+        p3 = self.fixture.pegging(self.fixture.f2, "remote-only pegging")
+        git(self.fixture.integration, "push", "-q", "origin", "HEAD:main")
+        git(self.fixture.integration, "reset", "--hard", "-q", self.fixture.p1)
+        git(self.fixture.integration, "update-ref", "-d", "refs/remotes/origin/main")
+        git(self.fixture.integration, "reflog", "expire", "--expire=now", "--all")
+        git(self.fixture.integration, "gc", "--prune=now", "--quiet")
+
+        proc, payload = self.fixture.run(
+            "--fetch", f"deadbeefdeadbeef..{p3}"
+        )
+
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(payload["fetch"], {
+            "requested": True, "attempted": True,
+            "status": "partially_succeeded",
+        })
 
     def test_inspect_reset_resolves_origin_head_and_detects_rewrite(self) -> None:
         git(self.fixture.integration, "config", "core.logAllRefUpdates", "always")

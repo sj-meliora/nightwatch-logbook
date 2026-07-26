@@ -8,7 +8,6 @@ md 템플릿은 logbook 모듈이 소유하며 대시보드 내장 렌더러가 
 exit code: 0=성공 / 2=인자 오류 / 3=IO 오류
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -18,7 +17,7 @@ import logbook
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
+    ap = logbook.JsonArgumentParser(
         description="reviews/daily/{date}.md + reviews/monthly/{YYYY-MM}.md 렌더링.")
     ap.add_argument("--date", required=True, help="대상 일자 YYYY-MM-DD")
     ap.add_argument("--root", default=".", help="nightwatch-logbook repo 루트 (기본: cwd)")

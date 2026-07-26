@@ -10,7 +10,6 @@ run은 pegging sha(FTL sha와 1:1) 단위이며 구성별 run 시퀀스에 순�
 exit code: 0=성공 / 2=인자·검증 오류 / 3=IO 오류
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -33,7 +32,7 @@ def fail(msg: str, code: int = 2, error_code: str | None = None) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
+    ap = logbook.JsonArgumentParser(
         description="dobee parse-result 출력을 results/{config}/runs/에 적재.",
         epilog="facts 파일은 dobee CLI parse-result의 stdout JSON — run_id, "
                "pegging_sha, summary{total,pass,fail}, "

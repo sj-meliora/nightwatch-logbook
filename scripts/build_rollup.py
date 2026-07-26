@@ -4,7 +4,6 @@
 exit code: 0=성공 / 2=인자 오류 / 3=IO 오류
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -14,7 +13,7 @@ import logbook
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="results/{config}/index.json 재생성.")
+    ap = logbook.JsonArgumentParser(description="results/{config}/index.json 재생성.")
     ap.add_argument("--date", required=True,
                     help="rollup의 updated에 기록할 실행 일자 YYYY-MM-DD")
     ap.add_argument("--config", help="특정 구성만 재생성 (기본: 전체)")

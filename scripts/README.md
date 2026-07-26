@@ -38,7 +38,8 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 각 스크립트의 인자는 `--help`로 확인한다 (스킬 문서에 사용법을 중복 기술하지
 않는다). 공통 계약: **stdout은 JSON 한 덩어리** (`schema_version` 포함),
 exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / `3`=IO 오류.
-실패 JSON에는 사람이 읽는 `error`와 함께 기계 판정용 `error_code`가 항상
+`argparse` 단계의 잘못된/누락된 인자를 포함해 실패 JSON에는 사람이 읽는
+`error`와 함께 기계 판정용 `error_code`가 항상
 포함된다. 호출자는 오류 문구를 비교해 exit code나 재시도 여부를 판정하지 말고
 프로세스 exit code와 `error_code`를 사용한다.
 
@@ -54,7 +55,15 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 
 - `requested`: 호출자가 `--fetch`를 지정했는지
 - `attempted`: 로컬 object가 없어 실제 fetch를 실행했는지
-- `status`: `not_requested` | `not_needed` | `succeeded` | `failed`
+- `status`: `not_requested` | `skipped` | `not_needed` | `succeeded` |
+  `partially_succeeded` | `failed`. 요청했지만 repo 검증처럼 fetch 전에 종료되면
+  `skipped`, 필요한 object가 모두 로컬에 있으면 `not_needed`, 여러 fetch 결과가
+  섞이면 `partially_succeeded`이다. fetch 명령이 성공해도 대상 commit을 해석하지
+  못하면 해당 시도는 실패로 집계한다.
+
+CLI 응답의 `schema_version`은 저장 데이터 스키마 버전을 함께 알리는 값이다.
+`error_code`와 `fetch` 같은 하위 호환 CLI 진단 필드 추가는 저장 JSON 형식을
+바꾸지 않으므로 현재 버전 2를 유지한다.
 
 stdout JSON에는 remote URL, repo 경로 및 git stderr를 싣지 않는다. 운영 로그나
 LLM 입력으로 credential·내부 주소가 유출되지 않도록 호출측에서도 stderr를

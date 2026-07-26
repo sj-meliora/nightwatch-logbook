@@ -17,8 +17,10 @@ dobee는 integration에 올라오는 pegging sha(FTL sha와 1:1) 단위로 전 �
   텍스트는 rationale 슬롯으로만 유입된다
 """
 
+import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 SCHEMA_VERSION = 2
@@ -27,6 +29,19 @@ CONF_ORDER = ["high", "medium", "unknown"]
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 RUN_FILE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d+)-([0-9a-f]{7,40})\.json$")
+
+
+class JsonArgumentParser(argparse.ArgumentParser):
+    """CLI 인자 실패를 공통 JSON 오류 계약으로 출력한다."""
+
+    def error(self, message: str) -> None:
+        del message  # 사용자 입력이 포함될 수 있어 오류 응답에는 되풀이하지 않는다.
+        json.dump({"schema_version": SCHEMA_VERSION, "ok": False,
+                   "error_code": "ARGUMENT_PARSING_FAILED",
+                   "error": "명령행 인자 오류 — --help로 사용법 확인"},
+                  sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+        self.exit(2)
 
 
 # ---------------------------------------------------------------- 파일 IO
