@@ -21,9 +21,10 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
              ftl_range = "직전pegging..이번pegging" — 후보 변경점 구간
 4. 신규 fail이 있으면: resolve_ftl.py --repo <integration_ftl> <ftl_range>
    └ pegging 구간을 submodule gitlink 기준 실제 FTL 커밋 목록으로 변환.
-     integration_ftl이 reset돼도 sha 직접 해석이라 안전하며, 되돌려진
-     커밋은 removed[]로 구분된다 (integration에서 git log를 직접 돌리지
-     말 것 — reset 시 구간이 통째로 사라지거나 ancestry가 끊긴다)
+     integration_ftl이 reset돼도 sha 직접 해석이라 안전하며, 현재 FTL
+     tip에서 도달할 수 없어진 커밋은 removed[]로 구분된다 (integration에서
+     git log를 직접 돌리지 말 것 — reset 시 구간이 통째로 사라지거나
+     ancestry가 끊긴다)
    (LLM) added[] 커밋 ↔ 신규 fail 매핑 → mapping.json 작성.
    added가 1개면 사실상 확정(high), 비어 있으면 원인이 FTL 밖 —
    매핑하지 말고 unknown으로 남긴다 (removed만 있으면 되돌림 자체가
@@ -37,6 +38,10 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
 각 스크립트의 인자는 `--help`로 확인한다 (스킬 문서에 사용법을 중복 기술하지
 않는다). 공통 계약: **stdout은 JSON 한 덩어리** (`schema_version` 포함),
 exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / `3`=IO 오류.
+`resolve_ftl.py` 실패 출력은 기계 판독용 `error_code`를 포함한다. `--fetch`를
+요청했지만 복원하지 못한 경우에는 URL·git stderr 대신 다음 안전한 진단만 싣는다:
+`fetch.requested`, `fetch.attempted`, `fetch.status` (`origin_missing`·
+`fetch_failed`·`object_missing_after_fetch`).
 
 ## mapping.json — LLM이 작성하는 유일한 파일
 
@@ -66,7 +71,7 @@ exit code는 `0`=성공 / `2`=인자·검증 오류 (LLM이 읽고 재시도) / 
 | `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
 | `status.py` | 조사 대상 구성(investigate) + 구성별 마지막 적재 run 조회 (읽기 전용) |
 | `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
-| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 + reset 전후 진단(`--inspect-reset`) (gitlink 기반, reset 안전, 읽기 전용) |
+| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 + reset 전후 진단(`--inspect-reset`, `reset_status`: detected·not_detected·unknown) (gitlink 기반, reset 안전, 읽기 전용) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
 | `render_reviews.py` | `reviews/daily/` + `reviews/monthly/` 렌더링 |
