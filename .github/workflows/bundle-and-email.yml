@@ -1,0 +1,31 @@
+name: Bundle and Email to GHE
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  bundle-and-send:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create bundle
+        run: git bundle create repo.bundle --all
+
+      - name: Send email with attachment
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Git bundle - ${{ github.sha }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: GitHub Actions
+          attachments: repo.bundle
