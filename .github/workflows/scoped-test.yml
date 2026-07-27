@@ -1,0 +1,93 @@
+name: Scoped Python tests
+
+on:
+  pull_request:
+    paths:
+      - '**.py'
+
+concurrency:
+  group: pr-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scoped-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
+      - name: Resolve test scope
+        id: scope
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          mapfile -t changed < <(
+            git diff --name-only --diff-filter=ACMR "origin/${BASE_REF}...HEAD" -- '*.py'
+          )
+
+          declare -A selected=()
+          missing=()
+
+          for file in "${changed[@]}"; do
+            name="${file##*/}"
+
+            # Tests changed directly by the pull request are always in scope.
+            if [[ "$name" == test_*.py ]]; then
+              selected["$file"]=1
+              continue
+            fi
+
+            # A source file foo.py is paired with tests/test_foo.py. The paired
+            # test must be part of this pull request, not merely exist on disk.
+            test_file="tests/test_${name}"
+            changed_test=false
+            for candidate in "${changed[@]}"; do
+              if [[ "$candidate" == "$test_file" ]]; then
+                changed_test=true
+                break
+              fi
+            done
+
+            if [[ "$changed_test" == true ]]; then
+              selected["$test_file"]=1
+            else
+              missing+=("$file -> $test_file")
+            fi
+          done
+
+          mapfile -t test_files < <(printf '%s\n' "${!selected[@]}" | sed '/^$/d' | sort)
+
+          {
+            echo 'test_files<<EOF'
+            printf '%s\n' "${test_files[@]}"
+            echo 'EOF'
+            echo 'missing_tests<<EOF'
+            printf '%s\n' "${missing[@]}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Fail if source changed without matching test diff
+        if: steps.scope.outputs.missing_tests != ''
+        env:
+          MISSING_TESTS: ${{ steps.scope.outputs.missing_tests }}
+        run: |
+          echo '다음 소스는 변경됐지만 대응 테스트가 PR에 없습니다:'
+          printf '%s\n' "$MISSING_TESTS"
+          exit 1
+
+      - name: Run scoped tests only
+        env:
+          TEST_FILES: ${{ steps.scope.outputs.test_files }}
+        run: |
+          mapfile -t test_files <<< "$TEST_FILES"
+          pytest "${test_files[@]}"
