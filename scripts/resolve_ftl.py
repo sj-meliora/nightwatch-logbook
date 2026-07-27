@@ -100,8 +100,14 @@ class ResolutionError:
 
 
 def git(repo: Path, *args: str) -> tuple[int, str, str]:
+    # Git의 log 출력은 기본적으로 UTF-8이지만 text=True만 지정하면 Python이
+    # Windows 콘솔 코드 페이지(cp949 등)를 사용해 decode한다. 커밋 제목에
+    # 한글이 포함된 경우 여기서 UnicodeDecodeError가 날 수 있으므로 Git 출력
+    # 인코딩을 명시한다. 손상되었거나 선언이 잘못된 과거 커밋도 진단 전체를
+    # 중단시키지 않도록 디코딩 불가 바이트는 대체 문자로 보존한다.
     p = subprocess.run(["git", "-C", str(repo), *args],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return p.returncode, p.stdout.strip(), p.stderr.strip()
 
 

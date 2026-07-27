@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -85,6 +86,24 @@ class ResolveFtlTests(unittest.TestCase):
         self.assertTrue(payload["ftl_forward"])
         self.assertEqual([c["sha"] for c in payload["added"]], [self.fixture.f2])
         self.assertEqual(payload["removed"], [])
+
+    def test_korean_commit_subject_with_cp949_console(self) -> None:
+        f3 = self.fixture.commit(
+            self.fixture.ftl, "three.txt", "three", "한글 FTL 커밋"
+        )
+        p3 = self.fixture.pegging(f3, "한글 pegging 커밋")
+        env = dict(os.environ, PYTHONIOENCODING="cp949")
+
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--repo", str(self.fixture.integration),
+             "--ftl-repo", str(self.fixture.ftl),
+             f"{self.fixture.p2}..{p3}"],
+            capture_output=True, encoding="cp949", env=env,
+        )
+        payload = json.loads(proc.stdout)
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(payload["added"][0]["subject"], "한글 FTL 커밋")
 
     def test_unchanged_gitlink_has_no_commit_difference(self) -> None:
         p3 = self.fixture.pegging(self.fixture.f2, "same FTL pegging")
