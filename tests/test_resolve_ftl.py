@@ -52,6 +52,13 @@ class GitFixture:
         git(self.integration, "commit", "-q", "--allow-empty", "-m", subject)
         return git(self.integration, "rev-parse", "HEAD")
 
+    def pegging_multi(self, links: dict[str, str], subject: str) -> str:
+        """FTL 외 submodule(예: FIL)까지 함께 gitlink를 설정하는 pegging."""
+        for path, sha in links.items():
+            git(self.integration, "update-index", "--add", "--cacheinfo", f"160000,{sha},{path}")
+        git(self.integration, "commit", "-q", "--allow-empty", "-m", subject)
+        return git(self.integration, "rev-parse", "HEAD")
+
     def run(self, *args: str) -> tuple[subprocess.CompletedProcess, dict]:
         proc = subprocess.run(
             [sys.executable, str(SCRIPT), "--repo", str(self.integration),
@@ -272,6 +279,66 @@ class ResolveFtlTests(unittest.TestCase):
         self.assertEqual(payload["added_total"], 2)
         self.assertEqual(len(payload["added"]), 1)
         self.assertTrue(payload["added_truncated"])
+
+    def test_no_other_submodule_change_yields_empty_companions(self) -> None:
+        proc, payload = self.fixture.run(f"{self.fixture.p1}..{self.fixture.p2}")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(payload["companions"], [])
+
+    def test_companion_change_detected_when_ftl_unchanged(self) -> None:
+        # FTL이 정지된 구간에서도 다른 layer(FIL)가 움직이면 신규 fail의 원인일 수
+        # 있다 — resolve_ftl.py가 이를 companions[]로 표면화해야 "원인이 FTL 밖"
+        # 이라고 성급히 단정해 매핑을 포기하지 않는다.
+        fil = self.fixture.root / "fil"
+        GitFixture._init_repo(fil)
+        i1 = GitFixture.commit(fil, "fil.txt", "one", "FIL one")
+        i2 = GitFixture.commit(fil, "fil.txt", "two", "FIL two")
+
+        p3 = self.fixture.pegging_multi(
+            {"FTL": self.fixture.f2, "FIL": i1}, "pegging three (FIL baseline)")
+        p4 = self.fixture.pegging_multi(
+            {"FTL": self.fixture.f2, "FIL": i2}, "pegging four (FIL only)")
+
+        proc, payload = self.fixture.run("--sub-repo", f"FIL={fil}", f"{p3}..{p4}")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(payload["ftl_changed"])
+        self.assertEqual(payload["added"], [])
+
+        companions = payload["companions"]
+        self.assertEqual(len(companions), 1)
+        self.assertEqual(companions[0]["path"], "FIL")
+        self.assertTrue(companions[0]["repo_available"])
+        self.assertEqual([c["sha"] for c in companions[0]["commits"]], [i2])
+        self.assertEqual(companions[0]["commits_total"], 1)
+        self.assertEqual(companions[0]["removed_total"], 0)
+        self.assertTrue(any("companions" in n and "FTL 밖으로 단정하지 말고" in n
+                            for n in payload["notes"]))
+
+    def test_companion_repo_unavailable_reports_sha_only(self) -> None:
+        fil = self.fixture.root / "fil"
+        GitFixture._init_repo(fil)
+        i1 = GitFixture.commit(fil, "fil.txt", "one", "FIL one")
+        i2 = GitFixture.commit(fil, "fil.txt", "two", "FIL two")
+
+        p3 = self.fixture.pegging_multi({"FTL": self.fixture.f2, "FIL": i1}, "pegging three")
+        p4 = self.fixture.pegging_multi({"FTL": self.fixture.f2, "FIL": i2}, "pegging four")
+
+        proc, payload = self.fixture.run(f"{p3}..{p4}")  # --sub-repo 미지정
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        companions = payload["companions"]
+        self.assertEqual(len(companions), 1)
+        self.assertFalse(companions[0]["repo_available"])
+        self.assertIsNone(companions[0]["commits"])
+        self.assertEqual(companions[0]["from"], i1)
+        self.assertEqual(companions[0]["to"], i2)
+        self.assertTrue(any("FIL" in n and "repo 접근 불가" in n for n in payload["notes"]))
+
+    def test_malformed_sub_repo_argument_is_rejected(self) -> None:
+        proc, payload = self.fixture.run(
+            "--sub-repo", "badspec", f"{self.fixture.p1}..{self.fixture.p2}")
+        self.assertEqual(proc.returncode, 2)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error_code"], "INVALID_ARGUMENT")
 
 
 if __name__ == "__main__":

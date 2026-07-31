@@ -54,7 +54,10 @@ dobee는 integration의 pegging sha(FTL sha와 1:1) 단위로 전 구성을 테�
   신규 (`status: new`, `since_sha` = 이 run의 pegging). 후보 변경점은
   `(직전 pegging..since_sha]` 구간의 FTL 커밋들 —
   `scripts/resolve_ftl.py`가 pegging 커밋의 submodule gitlink에서
-  해석합니다 (integration이 reset돼도 안전).
+  해석합니다 (integration이 reset돼도 안전). 같은 구간에서 FIL·HOME 등
+  FTL 외 submodule이 함께 pegging된 경우도 `companions[]`로 함께
+  보고하므로, FTL이 그대로였다고 해서 원인을 곧바로 FTL 밖이라 단정하지
+  않습니다.
 - `suspect_sha` / `confidence`(high·medium·unknown)는 **agent 추정 결과**로,
   dobee가 알려주는 사실(status/since/since_sha/로그)과 구분됩니다.
 - **회사 AI 정책: 개발자 아이디는 repo에 기록하지 않습니다.** suspect는 sha로만

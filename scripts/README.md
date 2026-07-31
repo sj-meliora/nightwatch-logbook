@@ -24,10 +24,15 @@ autodevops nightwatch 스킬이 호출하는 production 진입점과, 같은 쓰
      integration_ftl이 reset돼도 sha 직접 해석이라 안전하며, 현재 FTL
      tip에서 도달할 수 없어진 커밋은 removed[]로 구분된다 (integration에서
      git log를 직접 돌리지 말 것 — reset 시 구간이 통째로 사라지거나
-     ancestry가 끊긴다)
-   (LLM) added[] 커밋 ↔ 신규 fail 매핑 → mapping.json 작성.
-   added가 1개면 사실상 확정(high), 비어 있으면 원인이 FTL 밖 —
-   매핑하지 말고 unknown으로 남긴다 (removed만 있으면 되돌림 자체가
+     ancestry가 끊긴다).
+     같은 구간에서 FTL 외 submodule(FIL·HOME 등)이 함께 pegging됐으면
+     companions[]에 그 커밋 목록까지 담아 나온다 — 초기화된 submodule이
+     없으면 `--sub-repo PATH=DIR`로 로컬 clone을 지정한다
+   (LLM) added[]·companions[].commits 커밋 ↔ 신규 fail 매핑 → mapping.json 작성.
+   added가 1개면 사실상 확정(high). **added가 비어 있다고 곧바로 unknown으로
+   남기지 말 것** — companions[]에 변경점이 있으면 그쪽이 원인일 수 있으니
+   먼저 검토한다. added도 companions도 모두 비어 있을 때만 원인이 이
+   구간 밖이라고 판단해 매핑하지 않는다 (removed만 있으면 되돌림 자체가
    원인일 수 있으니 수동 판단)
 5. apply_mapping.py              # 검증 후 추정 필드 기입 (원자적, 실패 시 exit 2)
 6. build_rollup.py               # index.json 재생성
@@ -97,7 +102,7 @@ LLM 입력으로 credential·내부 주소가 유출되지 않도록 호출측�
 | `logbook.py` | 공용 모듈 — 직렬화·run 시퀀스 diff·rollup·md 템플릿 (모든 쓰기의 단일 경로) |
 | `status.py` | 조사 대상 구성(investigate) + 구성별 마지막 적재 run 조회 (읽기 전용) |
 | `ingest_run.py` | facts JSON → `results/{config}/runs/` (append-only — 덮어쓰기는 `--force`) |
-| `resolve_ftl.py` | pegging sha → 반영된 FTL 커밋 해석 + reset 전후 진단(`--inspect-reset`, `reset_status`: detected·not_detected·unknown) (gitlink 기반, reset 안전, 읽기 전용) |
+| `resolve_ftl.py` | pegging 구간 → 반영된 FTL 커밋 + 동반 submodule 변경점(`companions[]`, `--sub-repo`) 해석 + reset 전후 진단(`--inspect-reset`, `reset_status`: detected·not_detected·unknown) (gitlink 기반, reset 안전, 읽기 전용) |
 | `apply_mapping.py` | mapping.json 검증·기입 |
 | `build_rollup.py` | `index.json` 재생성 |
 | `render_reviews.py` | `reviews/daily/` + `reviews/monthly/` 렌더링 |
