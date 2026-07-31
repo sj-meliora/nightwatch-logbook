@@ -20,8 +20,13 @@ FTL sha를 가리킨다. 그런데 integration_ftl은 잘못된 pegging을 정�
 - 단건: `resolve_ftl.py --repo R <sha>` — 그 pegging의 FTL sha만 해석
 - 구간: `resolve_ftl.py --repo R <직전..이번>` — ingest_run.py stdout의
   `ftl_range`를 그대로 넘기는 데일리 흐름의 표준 사용법. added가 1개면
-  사실상 확정(high), added가 비어 있으면 원인이 FTL 밖이다 (removed만
-  있으면 되돌림 자체가 원인일 수 있으니 수동 판단)
+  사실상 확정(high). **added가 비어 있어도 곧바로 "원인이 FTL 밖"으로
+  단정하지 말 것** — 신규 fail은 FTL이 아니라 같은 구간에 함께 pegging된
+  다른 submodule(FIL·HOME 등) 변경이 원인인 경우가 있다. 이 구간에서
+  FTL 외 submodule gitlink가 움직였는지는 `companions[]`에 실제 커밋
+  목록까지 담겨 나온다 — 초기화된 submodule이 없으면 `--sub-repo
+  PATH=DIR`로 로컬 clone을 지정한다 (removed만 있으면 되돌림 자체가
+  원인일 수 있으니 수동 판단)
 - reset 진단: `resolve_ftl.py --repo R --inspect-reset` — reset 전후로
   integration/FTL tip이 각각 무엇이었고 어떻게 바뀌었는지 best effort로
   재구성한다. reset 이전 tip은 ① 이 clone의 remote-tracking reflog
@@ -39,12 +44,15 @@ exit code: 0=성공 (진단 모드에서 '판별 불가'도 성공 — notes 참
 
 from dataclasses import dataclass
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import logbook
+
+NULL_SHA_RE = re.compile(r"^0+$")
 
 
 def emit(payload: dict, code: int = 0) -> int:
@@ -237,6 +245,77 @@ def ftl_diff(ftl: Path, prev_sha: str, cur_sha: str, fetch: FetchReport,
     }, None
 
 
+def companion_repo(integ: Path, sub_repos: dict[str, Path], path: str) -> Path | None:
+    """path의 로컬 clone. --sub-repo 지정 우선, 없으면 초기화된 submodule."""
+    if path in sub_repos:
+        repo = sub_repos[path]
+        return repo if is_git_repo(repo) else None
+    cand = integ / path
+    if not is_git_repo(cand):
+        return None
+    # 미초기화 submodule은 빈 디렉토리라 git -C가 상위(integration) repo로 해석된다
+    if git(cand, "rev-parse", "--show-toplevel")[1] == git(integ, "rev-parse", "--show-toplevel")[1]:
+        return None
+    return cand
+
+
+def companions_in_range(integ: Path, prev_sha: str, cur_sha: str, primary: str,
+                         sub_repos: dict[str, Path], fetch: FetchReport,
+                         limit: int) -> tuple[list[dict], list[str]]:
+    """prev_sha..cur_sha 구간에서 primary(FTL) 외 submodule gitlink 변경을 열거한다.
+
+    dobee run은 pegging 1개 단위지만, 이 구간(직전 run..이번 run)에는 dobee가
+    돌지 않은 pegging이 여러 개 끼어 있을 수 있다. 그래서 first-parent diff가
+    아니라 두 트리(prev_sha, cur_sha) 자체를 통째로 비교한다 — 구간 안에서
+    몇 번을 움직였든 최종 gitlink 전후 값만 있으면 된다.
+    """
+    rc, out, _ = git(integ, "diff-tree", "--no-renames", "-r", "--raw", "--full-index",
+                     prev_sha, cur_sha)
+    if rc != 0:
+        return [], ["companion 변경점 조회 실패 — integration diff 읽기 오류"]
+    notes: list[str] = []
+    result: list[dict] = []
+    for line in out.splitlines():
+        if not line.startswith(":"):
+            continue
+        front, _, path = line.partition("\t")
+        old_mode, new_mode, old_sha, new_sha = front[1:].split()[:4]
+        if "160000" not in (old_mode, new_mode) or path == primary:
+            continue
+        entry: dict = {"path": path,
+                       "from": None if NULL_SHA_RE.match(old_sha) else old_sha,
+                       "to": None if NULL_SHA_RE.match(new_sha) else new_sha,
+                       "commits": None, "commits_total": None,
+                       "commits_truncated": None, "removed_total": None,
+                       "repo_available": False}
+        repo = companion_repo(integ, sub_repos, path)
+        if repo is None:
+            notes.append(f"{path!r} repo 접근 불가 — gitlink 전후 sha만 보고 "
+                         "(--sub-repo PATH=DIR로 지정)")
+        elif entry["from"] is None or entry["to"] is None:
+            notes.append(f"{path!r} submodule이 이 구간에서 추가/제거됨 — 커밋 목록 생략")
+        elif any(resolve_commit(repo, sha, fetch) is None
+                for sha in (entry["from"], entry["to"])):
+            notes.append(f"{path!r} repo에 gitlink 대상 커밋 없음 — --fetch로 재시도")
+        else:
+            try:
+                added, total, trunc = list_commits(
+                    repo, f"{entry['from']}..{entry['to']}", limit)
+                _, removed_total, _ = list_commits(
+                    repo, f"{entry['to']}..{entry['from']}", limit)
+            except RuntimeError:
+                notes.append(f"{path!r} 커밋 열거 실패")
+            else:
+                entry.update({"commits": added, "commits_total": total,
+                              "commits_truncated": trunc, "removed_total": removed_total,
+                              "repo_available": True})
+                if removed_total:
+                    notes.append(f"{path!r} gitlink 비전진 이동 — removed "
+                                 f"{removed_total}건은 되돌려진 커밋")
+        result.append(entry)
+    return result, notes
+
+
 # ---------------------------------------------------------------- 모드별 실행
 
 def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
@@ -251,9 +330,19 @@ def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
                     fetch=args.fetch_report.payload())
 
     changed = prev["ftl_sha"] != cur["ftl_sha"]
+    companions, companion_notes = companions_in_range(
+        integ, prev["sha"], cur["sha"], args.submodule, args.sub_repos,
+        args.fetch_report, args.limit)
+    has_companion_commits = any(c["commits_total"] for c in companions)
+
     notes = []
-    if not changed:
-        notes.append("FTL gitlink 변동 없음 — 원인이 FTL 밖일 수 있음 (매핑하지 말 것)")
+    if not changed and not has_companion_commits:
+        notes.append("FTL gitlink 변동 없음 — 이 구간의 다른 submodule도 변동 없음 "
+                     "(원인이 이 구간 밖일 수 있음, 매핑하지 말 것)")
+    elif not changed:
+        notes.append("FTL gitlink 변동 없음 — companions[]에 이 구간에서 변경된 "
+                     "다른 layer가 있다. FTL 밖으로 단정하지 말고 그쪽 커밋을 먼저 검토할 것")
+    notes.extend(companion_notes)
     if diff["removed_total"]:
         notes.append("FTL gitlink 간 비전진 변경 감지 — removed는 현재 tip에서 "
                      "도달할 수 없어진 커밋. reset·rebase·branch 전환 여부는 별도 "
@@ -270,6 +359,7 @@ def run_range(args, integ: Path, prev: dict, cur: dict) -> int:
         "ftl_changed": changed,
         "ftl_range": f"{prev['ftl_short']}..{cur['ftl_short']}",
         **diff,
+        "companions": companions,
         "notes": notes,
         "fetch": args.fetch_report.payload(),
     })
@@ -380,10 +470,14 @@ def run_inspect(args, integ: Path) -> int:
 
 def main() -> int:
     ap = logbook.JsonArgumentParser(
-        description="integration pegging sha에서 반영된 FTL 커밋을 해석 (reset 안전).",
+        description="integration pegging sha에서 반영된 FTL 커밋 및 동반 submodule "
+                    "변경점(companions)을 해석 (reset 안전).",
         epilog="예: resolve_ftl.py --repo ~/integration_ftl a3f9c21..77d0e4f "
                "(ingest_run.py stdout의 ftl_range 그대로). sha 하나만 주면 그 "
-               "pegging의 FTL sha만 해석한다. --inspect-reset은 reset 전후의 "
+               "pegging의 FTL sha만 해석한다. 구간 모드는 FTL 외에 이 구간에서 "
+               "함께 pegging된 다른 submodule(FIL·HOME 등)도 companions[]로 "
+               "보고한다 — --sub-repo FIL=~/work/FIL처럼 로컬 clone을 지정하면 "
+               "커밋 목록까지 펼친다. --inspect-reset은 reset 전후의 "
                "integration/FTL tip 변화를 reflog 기반 best effort로 재구성한다.")
     ap.add_argument("range_or_sha", nargs="?",
                     help="pegging sha 하나 또는 '직전pegging..이번pegging' 구간")
@@ -392,6 +486,12 @@ def main() -> int:
                     help="submodule 경로 (기본: FTL)")
     ap.add_argument("--ftl-repo",
                     help="FTL repo 경로 (기본: <repo>/<submodule> — 초기화된 submodule)")
+    ap.add_argument("--sub-repo", action="append", default=[], metavar="PATH=DIR",
+                    help="구간 모드에서 FTL 외 submodule의 동반 변경(companions)을 "
+                         "펼쳐볼 로컬 clone 경로 (예: FIL=~/work/FIL). PATH는 "
+                         "integration tree 안의 경로, DIR은 로컬 clone. 미지정 시 "
+                         "<repo>/<PATH>의 초기화된 submodule을 시도하고, 그마저 없으면 "
+                         "gitlink 전후 sha만 보고한다. 필요한 만큼 반복 지정")
     ap.add_argument("--fetch", action="store_true",
                     help="로컬에 없는 sha를 origin에서 fetch 시도 (best effort)")
     ap.add_argument("--limit", type=int, default=100,
@@ -406,6 +506,14 @@ def main() -> int:
                          "기록이 없을 때 (예: 로그북 run 시퀀스의 마지막 pegging)")
     args = ap.parse_args()
     args.fetch_report = FetchReport(args.fetch)
+
+    args.sub_repos = {}
+    for spec in args.sub_repo:
+        path, sep, repo = spec.partition("=")
+        if not sep or not path or not repo:
+            return fail("INVALID_ARGUMENT", f"--sub-repo 형식 오류: {spec!r} (PATH=DIR)",
+                        fetch=args.fetch_report.payload())
+        args.sub_repos[path] = Path(repo).resolve()
 
     integ = Path(args.repo).resolve()
     if not is_git_repo(integ):
