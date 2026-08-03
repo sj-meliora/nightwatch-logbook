@@ -1,0 +1,75 @@
+name: Nightly data pipeline
+
+# 데일리 파이프라인 자동 실행 — autodevops nightwatch 스킬의 무인 실행 버전.
+# 오케스트레이션 프롬프트(.github/prompts/nightly.md)와 쓰기 로직(scripts/)이
+# 이 repo에 함께 있으므로, 트리거도 여기서 관리해 버전 스큐를 없앤다.
+
+on:
+  schedule:
+    # 07:00 KST (22:00 UTC) — dobee 데일리 회귀 완료 시각에 맞춰 조정한다.
+    - cron: '0 22 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-pipeline
+  cancel-in-progress: false # 적재 중인 run을 끊지 않는다
+
+jobs:
+  nightly:
+    # 운영 전환 시 dobee/integration repo에 접근 가능한 self-hosted runner로
+    # 교체한다 (예: runs-on: [self-hosted, nightwatch]).
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # repository variables로 설정한다 (Settings > Variables)
+      NIGHTWATCH_INTEGRATION_REPO: ${{ vars.NIGHTWATCH_INTEGRATION_REPO }}
+      NIGHTWATCH_BASELINE_RUN: ${{ vars.NIGHTWATCH_BASELINE_RUN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight — dobee CLI 확인
+        run: |
+          if ! command -v dobee >/dev/null 2>&1; then
+            echo "::error::dobee CLI가 runner에 없습니다. dobee에 접근 가능한 self-hosted runner에서 실행해야 합니다."
+            exit 1
+          fi
+
+      - name: Run nightwatch agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            .github/prompts/nightly.md를 읽고 그 지시를 그대로 수행하라.
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+            --max-turns 150
+
+      - name: Commit & deploy
+        run: |
+          # 쓰기 허용 경로만 스테이징한다 — 그 외 변경은 커밋에서 제외하고 경고만 남긴다
+          git add results reviews
+          excluded=$(git status --porcelain -- . ':(exclude)results' ':(exclude)reviews')
+          if [ -n "$excluded" ]; then
+            echo "::warning::results/·reviews/ 외 변경이 발견되어 커밋에서 제외합니다:"
+            echo "$excluded"
+          fi
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋을 생략합니다."
+            exit 0
+          fi
+          git config user.name "nightwatch-agent"
+          git config user.email "nightwatch-agent@users.noreply.github.com"
+          git commit -m "data: $(TZ=Asia/Seoul date +%F) 데일리 결과 및 리뷰 반영"
+          # 커밋 = 배포 (Pages가 main root를 서빙). 일시적 실패는 재시도한다.
+          for delay in 2 4 8 0; do
+            git push origin HEAD:main && exit 0
+            [ "$delay" = 0 ] && break
+            echo "push 실패 — ${delay}s 후 재시도"
+            sleep "$delay"
+            git pull --rebase origin main
+          done
+          echo "::error::push에 반복 실패했습니다."
+          exit 1

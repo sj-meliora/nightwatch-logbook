@@ -21,6 +21,11 @@ run은 integration pegging sha(FTL sha와 1:1) 단위이고 전 구성 공통이
 
 - 운영 시 daily agent가 매일 위 파일들을 커밋하며, 커밋 = 배포다
   (Pages가 main 브랜치 root를 서빙, 대시보드 진입은 `/docs/`).
+- 데일리 실행 자동화는 `.github/workflows/nightly.yml`이 담당한다 — 매일
+  정해진 시각에 headless agent를 구동해 `scripts/README.md`의 데일리 실행
+  흐름을 수행한다 (오케스트레이션 프롬프트: `.github/prompts/nightly.md`,
+  커밋/푸시는 workflow의 후속 step 소유). 수동·복구 실행은 autodevops
+  nightwatch 스킬 경로를 그대로 사용한다.
 - 예시 데이터·리뷰는 `python3 scripts/generate_sample_data.py`로 재생성한다
   (구성별 fail 에피소드 정의에서 JSON/md를 파생 — 정합성이 구조적으로 보장됨).
 - 로컬 확인: repo 루트에서 `python3 -m http.server` 후 `/docs/` 접속.
